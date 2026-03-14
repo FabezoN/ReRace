@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum TicketStatus {
+  DRAFT
+  ON_SALE
+  PENDING
+  SOLD
+  CANCELLED
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  firstName   String
+  lastName    String
+  role        Role     @default(USER)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ticketsSelling Ticket[]      @relation("Seller")
+  ticketsBought  Transaction[] @relation("Buyer")
+  auditLogs      AuditLog[]
+}
+
+model GrandPrix {
+  id           String   @id @default(uuid())
+  externalId   String   @unique
+  name         String
+  circuitName  String
+  country      String
+  date         DateTime
+  season       Int
+  imageUrl     String?
+
+  tickets      Ticket[]
+
+  @@index([date])
+}
+
+model Ticket {
+  id            String       @id @default(uuid())
+  section       String
+  row           String
+  seat          String
+  price         Decimal      @db.Decimal(10, 2)
+  originalPrice Decimal?     @db.Decimal(10, 2)
+  currency      String       @default("EUR")
+  status        TicketStatus @default(DRAFT)
+  qrCodeUrl     String?
+  imageUrl      String?
+
+  sellerId      String
+  seller        User         @relation("Seller", fields: [sellerId], references: [id])
+  grandPrixId   String
+  grandPrix     GrandPrix    @relation(fields: [grandPrixId], references: [id])
+  transaction   Transaction?
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([grandPrixId, status])
+}
+
+model Transaction {
+  id              String            @id @default(uuid())
+  amount          Decimal           @db.Decimal(10, 2)
+  fees            Decimal           @db.Decimal(10, 2)
+  total           Decimal           @db.Decimal(10, 2)
+  status          TransactionStatus @default(PENDING)
+  stripePaymentId String?
+
+  buyerId         String?
+  buyer           User?             @relation("Buyer", fields: [buyerId], references: [id])
+  buyerEmail      String
+  ticketId        String            @unique
+  ticket          Ticket            @relation(fields: [ticketId], references: [id])
+
+  createdAt       DateTime          @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  details   Json?
+  ipAddress String?
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}

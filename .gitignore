@@ -1,0 +1,63 @@
+##############################
+# ReRace - Git Ignore global #
+##############################
+
+### Node / JavaScript ###
+node_modules/
+*/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+package-lock.json
+server/package-lock.json
+client/package-lock.json
+
+### Build / Output ###
+dist/
+build/
+*/dist/
+*/build/
+coverage/
+*.lcov
+.nyc_output/
+
+### Environment files (NE JAMAIS COMMIT) ###
+.env
+.env.local
+.env.*.local
+*/.env
+*/.env.local
+
+# Backend modes (Supabase / Docker)
+server/.env.docker
+server/.env.supabase
+
+### Logs ###
+logs/
+*.log
+
+### OS ###
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+### IDE / Editeurs ###
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+### Prisma / SQLite (si utilisé un jour) ###
+*.db
+*.db-journal
+
+### Divers / Temp ###
+*.tmp
+*.temp
