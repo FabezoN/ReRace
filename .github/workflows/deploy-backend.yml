@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'server/**'
+      - '.github/workflows/deploy-backend.yml'
 
 env:
   REGION:       europe-west1
