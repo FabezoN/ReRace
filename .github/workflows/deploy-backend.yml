@@ -1,0 +1,111 @@
+name: CI/CD Backend NestJS — ReRace
+
+# ─── Déclencheur ──────────────────────────────────────────────────────────────
+# Le pipeline se lance UNIQUEMENT quand du code est poussé sur "main"
+# ET que les fichiers modifiés sont dans server/
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+
+# ─── Variables d'environnement globales ───────────────────────────────────────
+env:
+  REGION:       europe-west1
+  REPO_NAME:    rerace-repo       # Nom du dépôt Artifact Registry
+  SERVICE_NAME: rerace-api        # Nom du service Cloud Run
+
+# ─── Jobs ─────────────────────────────────────────────────────────────────────
+jobs:
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # JOB 1 — TESTS (CI)
+  # Lance les 44 tests Jest sans connexion à la vraie base de données
+  # ════════════════════════════════════════════════════════════════════════════
+  test:
+    name: 🧪 Tests Jest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server
+
+    steps:
+      - name: 📥 Checkout du code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: 📦 Installation des dépendances
+        run: npm ci
+
+      - name: 🧬 Génération du client Prisma (nécessaire pour les types)
+        run: npx prisma generate
+
+      - name: ✅ Lancement des tests
+        run: npm run test
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # JOB 2 — BUILD & DEPLOY (CD)
+  # Ne s'exécute QUE si le job "test" est passé au vert
+  # ════════════════════════════════════════════════════════════════════════════
+  deploy:
+    name: 🚀 Build & Deploy sur GCP
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout du code
+        uses: actions/checkout@v4
+
+      # ── Authentification GCP ───────────────────────────────────────────────
+      - name: 🔐 Authentification Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: ⚙️ Setup Cloud SDK (gcloud)
+        uses: google-github-actions/setup-gcloud@v2
+
+      # ── Docker → Artifact Registry ─────────────────────────────────────────
+      - name: 🐳 Configurer Docker pour Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: 📦 Build & Push de l'image Docker
+        working-directory: ./server
+        run: |
+          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          echo "🏷️  Image : $IMAGE_TAG"
+          docker build -t $IMAGE_TAG .
+          docker push $IMAGE_TAG
+
+      # ── Déploiement Cloud Run ──────────────────────────────────────────────
+      - name: 🌐 Déploiement sur Cloud Run
+        run: |
+          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image          $IMAGE_TAG \
+            --region         ${{ env.REGION }} \
+            --platform       managed \
+            --allow-unauthenticated \
+            --port           3000 \
+            --set-env-vars   "\
+          DATABASE_URL=${{ secrets.DATABASE_URL }},\
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }},\
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }},\
+          SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},\
+          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }},\
+          STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }},\
+          FRONTEND_URL=${{ secrets.FRONTEND_URL }}"
+
+      - name: 🔗 URL du service déployé
+        run: |
+          echo "✅ Déployé sur :"
+          gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --format "value(status.url)"
