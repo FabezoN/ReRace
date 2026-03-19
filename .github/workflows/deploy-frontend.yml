@@ -1,0 +1,48 @@
+name: CI/CD Frontend React
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'client/**'
+      - '.github/workflows/deploy-frontend.yml'
+
+jobs:
+  build:
+    name: Build et verification TypeScript
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./client
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Installation des dependances
+        run: npm ci
+
+      - name: Build Vite (TypeScript + bundle)
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
+
+  deploy:
+    name: Deploiement sur Render
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Declencher le deploiement Render
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            --request POST \
+            --url "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
+          | grep -q "^2" && echo "Deploiement declenche avec succes" || (echo "Echec du declenchement" && exit 1)
