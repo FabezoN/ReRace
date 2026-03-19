@@ -78,7 +78,7 @@ export default function Header() {
                 <div className="flex items-center gap-4 border-l-2 border-f1-asphalt pl-4 ml-1">
                   <div className="text-right hidden md:block">
                     <p className="font-body text-xs text-f1-white/50">Connecté en tant que</p>
-                    <p className="font-body text-sm font-semibold text-f1-white">{user.email}</p>
+                    <p className="font-body text-sm font-semibold text-f1-white">{user?.email}</p>
                   </div>
                   <button
                     type="button"
