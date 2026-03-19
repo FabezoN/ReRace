@@ -131,7 +131,7 @@ describe('PaymentsService', () => {
     };
 
     // Le constructeur `new Stripe(key)` retournera notre mock
-    (Stripe as jest.Mock).mockImplementation(() => mockStripeInstance);
+    (Stripe as unknown as jest.Mock).mockImplementation(() => mockStripeInstance);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
