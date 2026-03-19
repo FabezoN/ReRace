@@ -10,9 +10,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-package-lock.json
-server/package-lock.json
-client/package-lock.json
+# package-lock.json intentionnellement commite pour CI/CD (npm ci)
 
 ### Build / Output ###
 dist/
