@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ProfileService, type ProfileUser, type PurchaseItem } from '../services/profile.service';
+import { ProfileService, type ProfileUser, type PurchaseItem, type ListingItem } from '../services/profile.service';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function ProfilePage() {
@@ -8,6 +8,8 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const [user, setUser] = useState<ProfileUser | null>(null);
   const [purchases, setPurchases] = useState<PurchaseItem[]>([]);
+  const [listings, setListings] = useState<ListingItem[]>([]);
+  const [listingsTab, setListingsTab] = useState<'ON_SALE' | 'SOLD'>('ON_SALE');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -16,10 +18,11 @@ export default function ProfilePage() {
   const [form, setForm] = useState({ firstName: '', lastName: '' });
 
   useEffect(() => {
-    Promise.all([ProfileService.getProfile(), ProfileService.getPurchases()])
-      .then(([profileRes, purchasesRes]) => {
+    Promise.all([ProfileService.getProfile(), ProfileService.getPurchases(), ProfileService.getListings()])
+      .then(([profileRes, purchasesRes, listingsRes]) => {
         setUser(profileRes.user ?? null);
         setPurchases(purchasesRes.purchases ?? []);
+        setListings(listingsRes.listings ?? []);
         if (profileRes.user) {
           setForm({
             firstName: profileRes.user.firstName ?? '',
@@ -208,6 +211,79 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* Mes ventes */}
+      <div className="bg-f1-asphalt rounded-xl p-6 md:p-8 border-2 border-f1-asphalt hover:border-f1-red/30 transition-colors mb-8">
+        <h2 className="font-racing text-xl text-f1-white italic uppercase mb-5">Mes ventes</h2>
+
+        {/* Onglets */}
+        <div className="flex gap-2 mb-6">
+          {(['ON_SALE', 'SOLD'] as const).map((tab) => {
+            const count = listings.filter((l) => l.status === tab).length;
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setListingsTab(tab)}
+                className={`font-racing text-xs font-bold py-2 px-4 -skew-x-12 border-2 uppercase transition-colors ${
+                  listingsTab === tab
+                    ? 'bg-f1-red border-f1-red text-f1-white'
+                    : 'border-f1-asphalt text-f1-white/70 hover:border-f1-red/60 hover:text-f1-white'
+                }`}
+              >
+                <span className="inline-block skew-x-12">
+                  {tab === 'ON_SALE' ? 'En vente' : 'Vendus'} ({count})
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {listings.filter((l) => l.status === listingsTab).length === 0 ? (
+          <p className="font-body text-f1-white/60">
+            {listingsTab === 'ON_SALE'
+              ? "Vous n'avez aucun billet en vente actuellement."
+              : "Vous n'avez pas encore vendu de billet."}
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {listings
+              .filter((l) => l.status === listingsTab)
+              .map((l) => (
+                <li
+                  key={l.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-f1-carbon rounded-xl border-2 border-f1-asphalt"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <p className="font-racing text-f1-white italic uppercase font-bold">{l.grandPrix.name}</p>
+                      <span className={`font-racing text-xs px-2 py-0.5 -skew-x-12 ${
+                        l.status === 'ON_SALE'
+                          ? 'bg-f1-green/20 border border-f1-green text-f1-green'
+                          : 'bg-f1-white/10 border border-f1-white/30 text-f1-white/60'
+                      }`}>
+                        <span className="inline-block skew-x-12">{l.status === 'ON_SALE' ? 'En vente' : 'Vendu'}</span>
+                      </span>
+                    </div>
+                    <p className="font-body text-f1-white/60 text-sm">{l.grandPrix.circuitName}</p>
+                    <p className="font-body text-f1-white/40 text-xs mt-0.5">
+                      {new Date(l.grandPrix.date).toLocaleDateString('fr-FR', {
+                        day: 'numeric', month: 'long', year: 'numeric',
+                      })}
+                    </p>
+                    <p className="font-body text-f1-white/70 text-sm mt-2">
+                      {l.section} · Rang {l.row} · Place {l.seat}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-racing text-f1-red font-bold text-xl">{Number(l.price).toFixed(2)} €</p>
+                  </div>
+                </li>
+              ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Mes achats */}
       <div className="bg-f1-asphalt rounded-xl p-6 md:p-8 border-2 border-f1-asphalt hover:border-f1-red/30 transition-colors">
         <h2 className="font-racing text-xl text-f1-white italic uppercase mb-4">Mes achats</h2>
         {purchases.length === 0 ? (

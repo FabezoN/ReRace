@@ -18,6 +18,7 @@ export interface Ticket {
   section: string;
   row: string;
   seat: string;
+  seller?: { firstName: string; id: string };
 }
 
 export interface CreateTicketData {

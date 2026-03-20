@@ -176,12 +176,16 @@ export default function TicketList({ grandPrixId }: TicketListProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sortedTickets.map((ticket) => {
             const isPast = grandPrix ? new Date(grandPrix.date) < new Date() : false;
+            const isOwnTicket = user && ticket.seller?.id === (user as { id?: string }).id;
+            const isDisabled = purchaseLoading === ticket.id || isPast || !!isOwnTicket;
             return (
             <div
               key={ticket.id}
               className={`rounded-xl p-6 border-2 transition-all duration-300 ${
                 isPast
                   ? 'bg-f1-asphalt/40 border-f1-asphalt/40 opacity-60'
+                  : isOwnTicket
+                  ? 'bg-f1-asphalt/40 border-f1-asphalt/60'
                   : 'bg-f1-asphalt border-f1-asphalt hover:border-f1-red'
               }`}
             >
@@ -189,6 +193,11 @@ export default function TicketList({ grandPrixId }: TicketListProps) {
                 <span className={`font-racing text-3xl font-bold ${isPast ? 'text-f1-white/50' : 'text-f1-red'}`}>
                   {Number(ticket.price).toFixed(2)} €
                 </span>
+                {isOwnTicket && (
+                  <span className="font-racing text-xs uppercase bg-f1-asphalt border border-f1-white/20 text-f1-white/50 px-2 py-1 -skew-x-12">
+                    <span className="inline-block skew-x-12">Votre billet</span>
+                  </span>
+                )}
               </div>
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between">
@@ -206,11 +215,17 @@ export default function TicketList({ grandPrixId }: TicketListProps) {
               </div>
               <button
                 className="w-full bg-f1-white text-f1-carbon font-racing font-bold py-3 rounded-lg hover:bg-f1-red hover:text-f1-white transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed -skew-x-12"
-                disabled={purchaseLoading === ticket.id || isPast}
-                onClick={() => !isPast && handleBuyClick(ticket.id)}
+                disabled={isDisabled}
+                onClick={() => !isDisabled && handleBuyClick(ticket.id)}
               >
                 <span className="inline-block skew-x-12">
-                  {purchaseLoading === ticket.id ? 'Redirection...' : isPast ? 'Indisponible' : 'Acheter'}
+                  {purchaseLoading === ticket.id
+                    ? 'Redirection...'
+                    : isPast
+                    ? 'Indisponible'
+                    : isOwnTicket
+                    ? 'Votre annonce'
+                    : 'Acheter'}
                 </span>
               </button>
             </div>

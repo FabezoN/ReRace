@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { GrandPrixService } from './grand-prix.service';
 
 @Injectable()
@@ -8,27 +8,24 @@ export class GrandPrixCronService implements OnModuleInit {
 
   constructor(private readonly grandPrixService: GrandPrixService) {}
 
-
   async onModuleInit() {
-    this.logger.log('🚀 Démarrage du serveur - Synchronisation initiale des Grands Prix...');
-    try {
-      const currentYear = new Date().getFullYear();
-      await this.grandPrixService.syncFromJolpica(currentYear);
-      this.logger.log('Synchronisation initiale terminée avec succès');
-    } catch (error) {
-      this.logger.error('Erreur lors de la synchronisation initiale:', error);
-    }
+    this.logger.log('Demarrage du serveur - Synchronisation initiale des Grands Prix...');
+    await this.sync('initiale');
   }
 
   @Cron('0 2 * * 0')
   async handleWeeklySync() {
-  this.logger.log(' Démarrage de la synchronisation hebdomadaire des Grands Prix...');
+    this.logger.log('Synchronisation hebdomadaire des Grands Prix (dimanche 02h00)...');
+    await this.sync('hebdomadaire');
+  }
+
+  private async sync(type: string) {
     try {
-       const currentYear = new Date().getFullYear();
-       await this.grandPrixService.syncFromJolpica(currentYear);
-       this.logger.log('Synchronisation hebdomadaire terminée avec succès');
-     } catch (error) {
-       this.logger.error(' Erreur lors de la synchronisation hebdomadaire:', error);
-     }
-   }
+      const currentYear = new Date().getFullYear();
+      const result = await this.grandPrixService.syncFromJolpica(currentYear);
+      this.logger.log(`Synchronisation ${type} terminee : ${result.count} Grands Prix`);
+    } catch (error) {
+      this.logger.error(`Erreur lors de la synchronisation ${type}:`, error);
+    }
+  }
 }

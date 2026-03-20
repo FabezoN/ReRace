@@ -45,6 +45,67 @@ function getCircuitImage(country: string, name: string, circuitName: string): st
   return `/circuits/${fallback}`;
 }
 
+function GpCard({ gp, isPast, navigate }: { gp: GrandPrix; isPast: boolean; navigate: (path: string) => void }) {
+  return (
+    <div
+      className={`rounded-xl overflow-hidden border-2 transition-all duration-300 group ${
+        isPast
+          ? 'bg-f1-carbon border-f1-asphalt/50 opacity-60 cursor-default'
+          : 'bg-f1-asphalt border-f1-asphalt hover:border-f1-red cursor-pointer'
+      }`}
+      onClick={() => navigate(`/races/${gp.id}`)}
+    >
+      <div className="h-52 md:h-56 bg-f1-carbon relative overflow-hidden">
+        <img
+          src={getCircuitImage(gp.country, gp.name, gp.circuitName)}
+          alt={gp.circuitName}
+          className={`w-full h-full object-cover transition-all duration-500 ${
+            isPast
+              ? 'opacity-30 grayscale'
+              : 'opacity-90 group-hover:opacity-100 group-hover:scale-105'
+          }`}
+          onError={(e) => { e.currentTarget.src = '/circuits/default.png'; }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" aria-hidden />
+        {isPast && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="font-racing text-f1-white/80 text-lg italic uppercase bg-black/60 px-4 py-2 -skew-x-12">
+              Terminé
+            </span>
+          </div>
+        )}
+        <div className={`absolute top-3 right-3 text-f1-white text-xs font-racing font-bold px-3 py-1.5 -skew-x-12 shadow-lg z-10 ${isPast ? 'bg-f1-white/30' : 'bg-f1-red'}`}>
+          {new Date(gp.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+        </div>
+      </div>
+
+      <div className="p-5 md:p-6">
+        <h2 className={`font-racing text-xl md:text-2xl mb-1 italic uppercase ${isPast ? 'text-f1-white/60' : 'text-f1-white'}`}>
+          {gp.name}
+        </h2>
+        <p className="font-body text-f1-white/50 text-sm mb-2">{gp.circuitName}</p>
+        <p className="font-body text-f1-white/40 text-xs uppercase tracking-wider mb-5">
+          {new Date(gp.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        </p>
+
+        {isPast ? (
+          <div className="w-full bg-f1-asphalt/50 text-f1-white/40 font-racing font-bold py-3 px-4 -skew-x-12 text-sm uppercase text-center">
+            <span className="inline-block skew-x-12">Grand Prix passé</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); navigate(`/races/${gp.id}`); }}
+            className="w-full bg-f1-white text-f1-carbon font-racing font-bold py-3 px-4 -skew-x-12 hover:bg-f1-red hover:text-f1-white transition-colors duration-200 text-sm uppercase"
+          >
+            <span className="inline-block skew-x-12">Voir les billets</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function GrandPrixList() {
   const navigate = useNavigate();
   const [races, setRaces] = useState<GrandPrix[]>([]);
@@ -87,26 +148,30 @@ export default function GrandPrixList() {
     );
   }
 
-  const searchLower = search.trim().toLowerCase();
-  const filteredRaces = searchLower
-    ? races.filter((gp) => {
-        const date = new Date(gp.date);
-        const dateFormats = [
-          date.toLocaleDateString('fr-FR'),
-          date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-          date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
-          date.toLocaleDateString('fr-FR', { month: 'long' }),
-          String(date.getFullYear()),
-        ].map((s) => s.toLowerCase());
+  const now = new Date();
 
-        return (
-          gp.name.toLowerCase().includes(searchLower) ||
-          gp.circuitName.toLowerCase().includes(searchLower) ||
-          (gp.country && gp.country.toLowerCase().includes(searchLower)) ||
-          dateFormats.some((d) => d.includes(searchLower))
-        );
-      })
-    : races;
+  const matchesSearch = (gp: GrandPrix) => {
+    const searchLower = search.trim().toLowerCase();
+    if (!searchLower) return true;
+    const date = new Date(gp.date);
+    const dateFormats = [
+      date.toLocaleDateString('fr-FR'),
+      date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+      date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
+      date.toLocaleDateString('fr-FR', { month: 'long' }),
+      String(date.getFullYear()),
+    ].map((s) => s.toLowerCase());
+    return (
+      gp.name.toLowerCase().includes(searchLower) ||
+      gp.circuitName.toLowerCase().includes(searchLower) ||
+      (gp.country && gp.country.toLowerCase().includes(searchLower)) ||
+      dateFormats.some((d) => d.includes(searchLower))
+    );
+  };
+
+  const upcomingRaces = races.filter((gp) => new Date(gp.date) >= now && matchesSearch(gp));
+  const pastRaces = races.filter((gp) => new Date(gp.date) < now && matchesSearch(gp)).reverse();
+  const filteredRaces = [...upcomingRaces, ...pastRaces];
 
   return (
     <div className="p-6 md:p-8">
@@ -144,91 +209,36 @@ export default function GrandPrixList() {
           </p>
         </div>
       ) : (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-        {filteredRaces.map((gp) => {
-          const isPast = new Date(gp.date) < new Date();
-          return (
-          <div
-            key={gp.id}
-            className={`rounded-xl overflow-hidden border-2 transition-all duration-300 group ${
-              isPast
-                ? 'bg-f1-carbon border-f1-asphalt/50 opacity-60 cursor-default'
-                : 'bg-f1-asphalt border-f1-asphalt hover:border-f1-red cursor-pointer'
-            }`}
-            onClick={() => navigate(`/races/${gp.id}`)}
-          >
-            <div className="h-52 md:h-56 bg-f1-carbon relative overflow-hidden">
-              <img
-                src={getCircuitImage(gp.country, gp.name, gp.circuitName)}
-                alt={gp.circuitName}
-                className={`w-full h-full object-cover transition-all duration-500 ${
-                  isPast
-                    ? 'opacity-30 grayscale'
-                    : 'opacity-90 group-hover:opacity-100 group-hover:scale-105'
-                }`}
-                onError={(e) => {
-                  e.currentTarget.src = '/circuits/default.png';
-                }}
-              />
-              <div
-                className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none"
-                aria-hidden
-              />
-              {isPast && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <span className="font-racing text-f1-white/80 text-lg italic uppercase bg-black/60 px-4 py-2 -skew-x-12">
-                    Terminé
-                  </span>
-                </div>
-              )}
-              <div
-                className={`absolute top-3 right-3 text-f1-white text-xs font-racing font-bold px-3 py-1.5 -skew-x-12 shadow-lg z-10 ${
-                  isPast ? 'bg-f1-white/30' : 'bg-f1-red'
-                }`}
-              >
-                {new Date(gp.date).toLocaleDateString('fr-FR', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                })}
+        <>
+          {/* GP à venir */}
+          {upcomingRaces.length > 0 && (
+            <div className="mb-16">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                {upcomingRaces.map((gp) => (
+                  <GpCard key={gp.id} gp={gp} isPast={false} navigate={navigate} />
+                ))}
               </div>
             </div>
+          )}
 
-            <div className="p-5 md:p-6">
-              <h2 className={`font-racing text-xl md:text-2xl mb-1 italic uppercase ${isPast ? 'text-f1-white/60' : 'text-f1-white'}`}>
-                {gp.name}
-              </h2>
-              <p className="font-body text-f1-white/50 text-sm mb-2">{gp.circuitName}</p>
-              <p className="font-body text-f1-white/40 text-xs uppercase tracking-wider mb-5">
-                {new Date(gp.date).toLocaleDateString('fr-FR', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              </p>
-
-              {isPast ? (
-                <div className="w-full bg-f1-asphalt/50 text-f1-white/40 font-racing font-bold py-3 px-4 -skew-x-12 text-sm uppercase text-center">
-                  <span className="inline-block skew-x-12">Grand Prix passé</span>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/races/${gp.id}`);
-                  }}
-                  className="w-full bg-f1-white text-f1-carbon font-racing font-bold py-3 px-4 -skew-x-12 hover:bg-f1-red hover:text-f1-white transition-colors duration-200 text-sm uppercase"
-                >
-                  <span className="inline-block skew-x-12">Voir les billets</span>
-                </button>
-              )}
+          {/* GP passés */}
+          {pastRaces.length > 0 && (
+            <div>
+              <div className="flex items-center gap-4 mb-8">
+                <div className="h-px flex-1 bg-f1-asphalt/60" />
+                <h2 className="font-racing text-2xl md:text-3xl text-f1-white/40 uppercase italic">
+                  Grands Prix <span className="text-f1-red/50">Terminés</span>
+                </h2>
+                <div className="h-px flex-1 bg-f1-asphalt/60" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                {pastRaces.map((gp) => (
+                  <GpCard key={gp.id} gp={gp} isPast={true} navigate={navigate} />
+                ))}
+              </div>
             </div>
-          </div>
-          );
-        })}
-      </div>
+          )}
+        </>
       )}
     </div>
   );

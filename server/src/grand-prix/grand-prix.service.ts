@@ -76,8 +76,12 @@ export class GrandPrixService {
       this.logger.log(`📥 ${races.length} courses récupérées depuis l'API`);
 
       const results: any[] = [];
+      const syncedExternalIds: string[] = [];
 
       for (const race of races) {
+        const expectedExternalId = `jolpica-${season}-${race.round}`;
+        syncedExternalIds.push(expectedExternalId);
+
         let raceDate = new Date(race.date);
         if (race.time) {
           const [hours, minutes, seconds] = race.time.split(':');
@@ -89,9 +93,7 @@ export class GrandPrixService {
         }
 
         const grandPrix = await this.prisma.grandPrix.upsert({
-          where: {
-            externalId: `jolpica-${season}-${race.round}`,
-          },
+          where: { externalId: expectedExternalId },
           update: {
             name: race.raceName,
             circuitName: race.Circuit.circuitName,
@@ -100,7 +102,7 @@ export class GrandPrixService {
             season: season,
           },
           create: {
-            externalId: `jolpica-${season}-${race.round}`,
+            externalId: expectedExternalId,
             name: race.raceName,
             circuitName: race.Circuit.circuitName,
             country: race.Circuit.Location.country,
@@ -112,6 +114,24 @@ export class GrandPrixService {
 
         results.push(grandPrix);
         this.logger.log(`✅ ${grandPrix.name} synchronisé`);
+      }
+
+      // Supprimer les GP de cette saison absents de l'API (ex : Jeddah ajouté manuellement)
+      const orphans = await this.prisma.grandPrix.findMany({
+        where: {
+          season: season,
+          externalId: { notIn: syncedExternalIds },
+        },
+        include: { tickets: true },
+      });
+
+      for (const orphan of orphans) {
+        if (orphan.tickets.length === 0) {
+          await this.prisma.grandPrix.delete({ where: { id: orphan.id } });
+          this.logger.log(`🗑️ GP supprimé (absent de l'API) : ${orphan.name}`);
+        } else {
+          this.logger.warn(`⚠️ GP absent de l'API mais conservé (a des billets) : ${orphan.name}`);
+        }
       }
 
       this.logger.log(`✨ Synchronisation terminée : ${results.length} Grands Prix`);

@@ -122,9 +122,11 @@ export default function SellTicket() {
             required
           >
             <option value="">Choisir une course...</option>
-            {races.map(gp => (
-              <option key={gp.id} value={gp.id}>{gp.name} ({new Date(gp.date).toLocaleDateString('fr-FR')})</option>
-            ))}
+            {races
+              .filter(gp => new Date(gp.date) >= new Date())
+              .map(gp => (
+                <option key={gp.id} value={gp.id}>{gp.name} ({new Date(gp.date).toLocaleDateString('fr-FR')})</option>
+              ))}
           </select>
         </div>
         <div className="grid grid-cols-3 gap-4">

@@ -41,7 +41,7 @@ export class TicketsService {
         status: TicketStatus.ON_SALE,
       },
       include: {
-        seller: { select: { firstName: true } }, 
+        seller: { select: { firstName: true, id: true } },
         grandPrix: {
           select: {
             id: true,

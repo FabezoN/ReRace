@@ -88,6 +88,28 @@ export class AppController {
     return { purchases: transactions };
   }
 
+  @Get('profile/listings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Billets mis en vente et vendus par l\'utilisateur' })
+  @ApiResponse({ status: 200, description: 'Billets ON_SALE et SOLD du vendeur' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  async getListings(@CurrentUser() user: { id: string }) {
+    const tickets = await this.prisma.ticket.findMany({
+      where: {
+        sellerId: user.id,
+        status: { in: ['ON_SALE', 'SOLD'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        grandPrix: {
+          select: { name: true, circuitName: true, date: true },
+        },
+      },
+    });
+    return { listings: tickets };
+  }
+
   @Delete('profile')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')

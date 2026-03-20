@@ -30,6 +30,21 @@ export interface PurchaseItem {
   };
 }
 
+export interface ListingItem {
+  id: string;
+  section: string;
+  row: string;
+  seat: string;
+  price: string;
+  status: 'ON_SALE' | 'SOLD';
+  createdAt: string;
+  grandPrix: {
+    name: string;
+    circuitName: string;
+    date: string;
+  };
+}
+
 export const ProfileService = {
   getProfile: async (): Promise<{ user: ProfileUser | null }> => {
     const response = await apiClient.get<{ user: ProfileUser | null }>('/profile');
@@ -43,6 +58,11 @@ export const ProfileService = {
 
   getPurchases: async (): Promise<{ purchases: PurchaseItem[] }> => {
     const response = await apiClient.get<{ purchases: PurchaseItem[] }>('/profile/purchases');
+    return response.data;
+  },
+
+  getListings: async (): Promise<{ listings: ListingItem[] }> => {
+    const response = await apiClient.get<{ listings: ListingItem[] }>('/profile/listings');
     return response.data;
   },
 
