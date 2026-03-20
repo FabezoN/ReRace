@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { TicketService, GrandPrixService, PaymentService } from '../services/grand-prix.service';
 import type { GrandPrix, Ticket } from '../services/grand-prix.service';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,7 @@ interface TicketListProps {
 
 export default function TicketList({ grandPrixId }: TicketListProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [grandPrix, setGrandPrix] = useState<GrandPrix | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,6 +56,10 @@ export default function TicketList({ grandPrixId }: TicketListProps) {
   }, [user]);
 
   const handleBuyClick = (ticketId: string) => {
+    if (!user) {
+      navigate('/auth/login', { state: { from: { pathname: window.location.pathname } } });
+      return;
+    }
     setSelectedTicketId(ticketId);
     setEmailError(null);
     setShowEmailModal(true);
