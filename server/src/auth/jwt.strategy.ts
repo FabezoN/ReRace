@@ -27,7 +27,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ignoreExpiration: true,
+      ignoreExpiration: false,
       secretOrKeyProvider: async (request, rawJwtToken, done) => {
         try {
           const { data: { user }, error } = await supabaseClient.auth.getUser(rawJwtToken);
@@ -44,7 +44,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
           request._supabasePayload = decoded;
           
-          this.logger.log(` Token validé par Supabase pour: ${user.email}`);
+          this.logger.log(`Token validé par Supabase pour: ${user.id}`);
           
           done(null, 'skip-signature-verification');
         } catch (err: any) {
@@ -87,7 +87,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!user) {
-      this.logger.log(`📝 Création de l'utilisateur dans Prisma: ${actualPayload.email}`);
+      this.logger.log(`Création de l'utilisateur dans Prisma: ${actualPayload.sub}`);
       user = await this.prisma.user.create({
         data: {
           id: actualPayload.sub,
@@ -99,7 +99,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       });
     }
 
-    this.logger.log(`Utilisateur trouvé/créé dans Prisma: ${user.email} (ID: ${user.id})`);
+    this.logger.log(`Utilisateur trouvé/créé dans Prisma: ${user.id}`);
     
     return { 
       id: user.id,

@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Body, Query, Headers, Req, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { PaymentsService } from './payments.service';
 import type { Request } from 'express';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
@@ -23,6 +24,7 @@ export class PaymentsController {
   }
 
   @Post('webhook')
+  @SkipThrottle()
   @ApiOperation({ summary: 'Webhook Stripe (événements checkout.session.completed)' })
   @ApiResponse({ status: 200, description: 'Événement traité' })
   @ApiResponse({ status: 400, description: 'Signature invalide ou raw body manquant' })
