@@ -1,4 +1,4 @@
-import { Controller, Get, Delete, Param, UseGuards, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Patch, Delete, Param, UseGuards, NotFoundException, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -144,6 +144,46 @@ export class AdminController {
       },
     });
     return { tickets };
+  }
+
+  @Get('disputes')
+  @ApiOperation({ summary: 'Liste des signalements (ADMIN)' })
+  @ApiResponse({ status: 200, description: 'Liste des litiges avec transaction et acheteur' })
+  @ApiResponse({ status: 403, description: 'Droits insuffisants' })
+  async getDisputes() {
+    const disputes = await this.prisma.dispute.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        transaction: {
+          include: {
+            buyer: { select: { email: true, firstName: true, lastName: true } },
+            ticket: {
+              include: {
+                grandPrix: { select: { name: true, date: true } },
+                seller: { select: { email: true, firstName: true, lastName: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    return { disputes };
+  }
+
+  @Patch('disputes/:id/resolve')
+  @ApiOperation({ summary: 'Resoudre un signalement (ADMIN)' })
+  @ApiParam({ name: 'id', description: 'UUID du litige' })
+  @ApiResponse({ status: 200, description: 'Signalement resolu' })
+  @ApiResponse({ status: 404, description: 'Litige non trouve' })
+  async resolveDispute(@Param('id') id: string, @Req() req: any) {
+    const dispute = await this.prisma.dispute.findUnique({ where: { id } });
+    if (!dispute) throw new NotFoundException('Litige non trouve');
+
+    const updated = await this.prisma.dispute.update({
+      where: { id },
+      data: { status: 'RESOLVED', resolvedAt: new Date(), resolvedById: req.user.id },
+    });
+    return { dispute: updated };
   }
 
   @Delete('tickets/:id')

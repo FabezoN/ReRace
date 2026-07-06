@@ -1,5 +1,26 @@
 import apiClient from '../lib/api';
 
+export interface AdminDispute {
+  id: string;
+  status: 'OPEN' | 'RESOLVED';
+  stripeRefundId: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  transaction: {
+    id: string;
+    total: string;
+    buyerEmail: string;
+    buyer: { email: string; firstName: string; lastName: string } | null;
+    ticket: {
+      section: string;
+      row: string;
+      seat: string;
+      grandPrix: { name: string; date: string };
+      seller: { email: string; firstName: string; lastName: string };
+    };
+  };
+}
+
 export interface AdminStats {
   totalUsers: number;
   totalAdmins: number;
@@ -64,6 +85,16 @@ export const AdminService = {
 
   deleteTicket: async (id: string): Promise<{ message: string; deleted: boolean }> => {
     const response = await apiClient.delete<{ message: string; deleted: boolean }>(`/admin/tickets/${id}`);
+    return response.data;
+  },
+
+  getDisputes: async (): Promise<{ disputes: AdminDispute[] }> => {
+    const response = await apiClient.get<{ disputes: AdminDispute[] }>('/admin/disputes');
+    return response.data;
+  },
+
+  resolveDispute: async (id: string): Promise<{ dispute: AdminDispute }> => {
+    const response = await apiClient.patch<{ dispute: AdminDispute }>(`/admin/disputes/${id}/resolve`);
     return response.data;
   },
 };

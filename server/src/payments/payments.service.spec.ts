@@ -15,7 +15,7 @@
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentsService } from './payments.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -78,6 +78,27 @@ const MOCK_TICKET_PENDING = { ...MOCK_TICKET_ON_SALE, status: TicketStatus.PENDI
 
 // ─── Mocks des dépendances ────────────────────────────────────────────────────
 
+const TRANSACTION_ID = 'e1f2a3b4-0004-4004-8004-555555555555';
+
+const MOCK_TRANSACTION_PENDING = {
+  id:              TRANSACTION_ID,
+  ticketId:        TICKET_ID,
+  buyerId:         BUYER_ID,
+  buyerEmail:      BUYER_EMAIL,
+  amount:          200,
+  fees:            10,
+  total:           210,
+  status:          'COMPLETED',
+  stripePaymentId: 'pi_test_monaco_2026',
+  buyerValidation: 'PENDING',
+  validatedAt:     null,
+  createdAt:       new Date(),
+  ticket: {
+    ...MOCK_TICKET_ON_SALE,
+    grandPrix: { ...MOCK_GRAND_PRIX, date: new Date('2025-05-24') }, // GP déjà passé
+  },
+};
+
 const mockPrisma = {
   ticket: {
     findUnique: jest.fn(),
@@ -85,11 +106,17 @@ const mockPrisma = {
     create:     jest.fn(),
   },
   transaction: {
+    create:     jest.fn(),
+    findUnique: jest.fn(),
+    update:     jest.fn(),
+  },
+  dispute: {
     create: jest.fn(),
   },
   user: {
     findUnique: jest.fn(),
   },
+  $transaction: jest.fn(),
 };
 
 const mockConfigService = {
@@ -111,6 +138,7 @@ describe('PaymentsService', () => {
   let mockStripeInstance: {
     checkout: { sessions: { create: jest.Mock; retrieve: jest.Mock } };
     webhooks: { constructEvent: jest.Mock };
+    refunds: { create: jest.Mock };
   };
 
   beforeEach(async () => {
@@ -127,6 +155,9 @@ describe('PaymentsService', () => {
       },
       webhooks: {
         constructEvent: jest.fn(),
+      },
+      refunds: {
+        create: jest.fn().mockResolvedValue({ id: 're_test_monaco_2026' }),
       },
     };
 
@@ -397,15 +428,163 @@ describe('PaymentsService', () => {
     });
 
     it('✅ doit retourner { cancelled: true } même si le billet est introuvable', async () => {
-      // Arrange : le ticket n'existe pas en base
+      // Arrange
       mockPrisma.ticket.findUnique.mockResolvedValue(null);
 
       // Act
       const result = await service.cancelPendingPurchase('uuid-inexistant');
 
-      // Assert : pas d'erreur lancée, retour gracieux
+      // Assert
       expect(result).toEqual({ cancelled: true });
       expect(mockPrisma.ticket.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── validateTicket() ─────────────────────────────────────────────────────
+
+  describe('validateTicket()', () => {
+    it('✅ doit valider le billet si le GP est passé et la validation en attente', async () => {
+      // Arrange
+      mockPrisma.transaction.findUnique.mockResolvedValue(MOCK_TRANSACTION_PENDING);
+      mockPrisma.transaction.update.mockResolvedValue({
+        ...MOCK_TRANSACTION_PENDING, buyerValidation: 'VALID',
+      });
+
+      // Act
+      const result = await service.validateTicket(TRANSACTION_ID, BUYER_ID);
+
+      // Assert
+      expect(result).toEqual({ success: true, status: 'VALID' });
+      expect(mockPrisma.transaction.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ buyerValidation: 'VALID' }),
+        }),
+      );
+    });
+
+    it('❌ doit lever NotFoundException si la transaction est introuvable', async () => {
+      // Arrange
+      mockPrisma.transaction.findUnique.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(
+        service.validateTicket('uuid-inexistant', BUYER_ID),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('❌ doit lever ForbiddenException si l\'utilisateur n\'est pas l\'acheteur', async () => {
+      // Arrange : la transaction appartient à BUYER_ID, pas à SELLER_ID
+      mockPrisma.transaction.findUnique.mockResolvedValue(MOCK_TRANSACTION_PENDING);
+
+      // Act & Assert
+      await expect(
+        service.validateTicket(TRANSACTION_ID, SELLER_ID),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('❌ doit lever BadRequestException si la validation est déjà effectuée', async () => {
+      // Arrange : validation déjà VALID
+      mockPrisma.transaction.findUnique.mockResolvedValue({
+        ...MOCK_TRANSACTION_PENDING, buyerValidation: 'VALID',
+      });
+
+      // Act & Assert
+      await expect(
+        service.validateTicket(TRANSACTION_ID, BUYER_ID),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('❌ doit lever BadRequestException si le GP n\'a pas encore eu lieu', async () => {
+      // Arrange : date du GP dans le futur
+      mockPrisma.transaction.findUnique.mockResolvedValue({
+        ...MOCK_TRANSACTION_PENDING,
+        ticket: {
+          ...MOCK_TRANSACTION_PENDING.ticket,
+          grandPrix: { ...MOCK_GRAND_PRIX, date: new Date('2099-12-31') },
+        },
+      });
+
+      // Act & Assert
+      await expect(
+        service.validateTicket(TRANSACTION_ID, BUYER_ID),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // ─── disputeTicket() ──────────────────────────────────────────────────────
+
+  describe('disputeTicket()', () => {
+    beforeEach(() => {
+      mockPrisma.$transaction.mockImplementation((ops: any[]) => Promise.all(ops));
+    });
+
+    it('✅ doit créer un litige et initier le remboursement Stripe', async () => {
+      // Arrange
+      mockPrisma.transaction.findUnique.mockResolvedValue(MOCK_TRANSACTION_PENDING);
+      mockPrisma.transaction.update.mockResolvedValue({
+        ...MOCK_TRANSACTION_PENDING, buyerValidation: 'DISPUTED', status: 'REFUNDED',
+      });
+      mockPrisma.dispute.create.mockResolvedValue({ id: 'dispute-001' });
+
+      // Act
+      const result = await service.disputeTicket(TRANSACTION_ID, BUYER_ID);
+
+      // Assert
+      expect(result).toEqual({ success: true, status: 'DISPUTED' });
+      expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith(
+        expect.objectContaining({ payment_intent: 'pi_test_monaco_2026' }),
+      );
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+    });
+
+    it('✅ doit marquer la transaction en REFUNDED lors d\'un litige', async () => {
+      // Arrange
+      mockPrisma.transaction.findUnique.mockResolvedValue(MOCK_TRANSACTION_PENDING);
+      mockPrisma.transaction.update.mockResolvedValue({});
+      mockPrisma.dispute.create.mockResolvedValue({});
+
+      // Act
+      await service.disputeTicket(TRANSACTION_ID, BUYER_ID);
+
+      // Assert : la transaction atomique inclut bien un update vers REFUNDED
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.anything(),
+          expect.anything(),
+        ]),
+      );
+    });
+
+    it('❌ doit lever NotFoundException si la transaction est introuvable', async () => {
+      // Arrange
+      mockPrisma.transaction.findUnique.mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(
+        service.disputeTicket('uuid-inexistant', BUYER_ID),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('❌ doit lever ForbiddenException si l\'utilisateur n\'est pas l\'acheteur', async () => {
+      // Arrange
+      mockPrisma.transaction.findUnique.mockResolvedValue(MOCK_TRANSACTION_PENDING);
+
+      // Act & Assert
+      await expect(
+        service.disputeTicket(TRANSACTION_ID, SELLER_ID),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('❌ doit lever BadRequestException si un litige est déjà ouvert', async () => {
+      // Arrange : validation déjà DISPUTED
+      mockPrisma.transaction.findUnique.mockResolvedValue({
+        ...MOCK_TRANSACTION_PENDING, buyerValidation: 'DISPUTED',
+      });
+
+      // Act & Assert
+      await expect(
+        service.disputeTicket(TRANSACTION_ID, BUYER_ID),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

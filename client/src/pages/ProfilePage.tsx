@@ -16,6 +16,7 @@ export default function ProfilePage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [form, setForm] = useState({ firstName: '', lastName: '' });
+  const [validatingId, setValidatingId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([ProfileService.getProfile(), ProfileService.getPurchases(), ProfileService.getListings()])
@@ -99,6 +100,36 @@ export default function ProfilePage() {
     }
   };
 
+  const handleValidate = async (transactionId: string) => {
+    setValidatingId(transactionId);
+    try {
+      await ProfileService.validateTicket(transactionId);
+      setPurchases((prev) =>
+        prev.map((p) => (p.id === transactionId ? { ...p, buyerValidation: 'VALID' as const, validatedAt: new Date().toISOString() } : p))
+      );
+    } catch {
+      setMessage({ type: 'error', text: 'Erreur lors de la validation.' });
+    } finally {
+      setValidatingId(null);
+    }
+  };
+
+  const handleDispute = async (transactionId: string) => {
+    if (!window.confirm('Confirmer que le billet etait non valide ? Un remboursement sera initie et un signalement envoye a l\'administration.')) return;
+    setValidatingId(transactionId);
+    try {
+      await ProfileService.disputeTicket(transactionId);
+      setPurchases((prev) =>
+        prev.map((p) => (p.id === transactionId ? { ...p, buyerValidation: 'DISPUTED' as const, validatedAt: new Date().toISOString() } : p))
+      );
+      setMessage({ type: 'success', text: 'Signalement enregistre. Votre remboursement est en cours de traitement.' });
+    } catch {
+      setMessage({ type: 'error', text: 'Erreur lors du signalement.' });
+    } finally {
+      setValidatingId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center">
@@ -168,6 +199,18 @@ export default function ProfilePage() {
               className="w-full bg-f1-carbon/80 border-2 border-f1-asphalt rounded px-4 py-3 text-f1-white/60 font-body cursor-not-allowed"
             />
             <p className="font-body text-f1-white/50 text-xs mt-1">L'email ne peut pas être modifié.</p>
+          </div>
+          <div>
+            <label className="block font-body text-f1-white/80 text-sm font-medium mb-2">
+              IBAN <span className="text-f1-white/40 font-normal">(pour recevoir vos paiements en tant que vendeur)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX"
+              readOnly
+              className="w-full bg-f1-carbon/80 border-2 border-f1-asphalt rounded px-4 py-3 text-f1-white/40 font-body cursor-not-allowed"
+            />
+            <p className="font-body text-f1-white/40 text-xs mt-1">Fonctionnalité disponible prochainement.</p>
           </div>
           <button
             type="submit"
@@ -311,8 +354,8 @@ export default function ProfilePage() {
                   </p>
                   <p className="font-racing text-f1-red font-bold mt-1">{Number(p.total).toFixed(2)} €</p>
                 </div>
-                <div>
-                  {p.ticket.imageUrl ? (
+                <div className="flex flex-col gap-2 items-end">
+                  {p.ticket.imageUrl && (
                     <button
                       type="button"
                       onClick={() =>
@@ -325,11 +368,53 @@ export default function ProfilePage() {
                       }
                       className="bg-f1-white text-f1-carbon font-racing font-bold py-2 px-4 -skew-x-12 hover:bg-f1-red hover:text-f1-white transition-colors duration-200 text-sm uppercase"
                     >
-                      <span className="inline-block skew-x-12">Télécharger le billet</span>
+                      <span className="inline-block skew-x-12">Telecharger le billet</span>
                     </button>
-                  ) : (
-                    <span className="font-body text-f1-white/50 text-sm">Aucune image</span>
                   )}
+
+                  {(() => {
+                    const gpPassed = true;
+                    if (!gpPassed) return null;
+
+                    if (p.buyerValidation === 'VALID') {
+                      return (
+                        <span className="font-body text-xs text-green-400 border border-green-400/40 rounded px-2 py-1">
+                          Billet valide
+                        </span>
+                      );
+                    }
+                    if (p.buyerValidation === 'DISPUTED') {
+                      return (
+                        <span className="font-body text-xs text-f1-red border border-f1-red/40 rounded px-2 py-1">
+                          Billet signale - remboursement en cours
+                        </span>
+                      );
+                    }
+                    return (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={validatingId === p.id}
+                          onClick={() => handleValidate(p.id)}
+                          className="bg-green-600 text-white font-racing font-bold py-2 px-3 -skew-x-12 hover:bg-green-500 disabled:opacity-50 transition-colors text-xs uppercase"
+                        >
+                          <span className="inline-block skew-x-12">
+                            {validatingId === p.id ? '...' : 'Billet valide'}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={validatingId === p.id}
+                          onClick={() => handleDispute(p.id)}
+                          className="bg-f1-red text-white font-racing font-bold py-2 px-3 -skew-x-12 hover:bg-red-700 disabled:opacity-50 transition-colors text-xs uppercase"
+                        >
+                          <span className="inline-block skew-x-12">
+                            {validatingId === p.id ? '...' : 'Billet non valide'}
+                          </span>
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               </li>
             ))}

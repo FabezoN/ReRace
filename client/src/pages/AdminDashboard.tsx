@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProfileService } from '../services/profile.service';
-import { AdminService, type AdminUser, type AdminTicket, type AdminStats } from '../services/admin.service';
+import { AdminService, type AdminUser, type AdminTicket, type AdminStats, type AdminDispute } from '../services/admin.service';
 
 function StatCard({
   label,
@@ -33,6 +33,8 @@ export default function AdminDashboard() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [disputes, setDisputes] = useState<AdminDispute[]>([]);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   useEffect(() => {
     ProfileService.getProfile()
@@ -42,13 +44,19 @@ export default function AdminDashboard() {
           return;
         }
         setCheckingAuth(false);
-        return Promise.all([AdminService.getStats(), AdminService.getUsers(), AdminService.getTickets()]);
+        return Promise.all([
+          AdminService.getStats(),
+          AdminService.getUsers(),
+          AdminService.getTickets(),
+          AdminService.getDisputes(),
+        ]);
       })
       .then((data) => {
         if (data) {
           setStats(data[0]);
           setUsers(data[1].users);
           setTickets(data[2].tickets);
+          setDisputes(data[3].disputes);
         }
       })
       .catch(() => navigate('/', { replace: true }))
@@ -64,6 +72,18 @@ export default function AdminDashboard() {
       console.error('Erreur suppression ticket');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleResolveDispute = async (id: string) => {
+    setResolvingId(id);
+    try {
+      await AdminService.resolveDispute(id);
+      setDisputes((prev) => prev.map((d) => d.id === id ? { ...d, status: 'RESOLVED' as const, resolvedAt: new Date().toISOString() } : d));
+    } catch {
+      console.error('Erreur resolution litige');
+    } finally {
+      setResolvingId(null);
     }
   };
 
@@ -271,6 +291,67 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Signalements */}
+      <section className="bg-f1-asphalt rounded-xl p-6 border-2 border-f1-asphalt mt-8">
+        <h2 className="font-racing text-xl text-f1-white italic uppercase mb-4">
+          Signalements <span className="text-f1-red">({disputes.filter((d) => d.status === 'OPEN').length} ouverts)</span>
+        </h2>
+        {disputes.length === 0 ? (
+          <p className="font-body text-f1-white/60 text-sm">Aucun signalement.</p>
+        ) : (
+          <div className="space-y-4">
+            {disputes.map((d) => (
+              <div
+                key={d.id}
+                className={`p-4 rounded-xl border-2 ${d.status === 'OPEN' ? 'border-f1-red/60 bg-f1-carbon' : 'border-f1-asphalt bg-f1-carbon/50'}`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`font-body text-xs px-2 py-0.5 rounded ${d.status === 'OPEN' ? 'bg-f1-red/20 text-f1-red' : 'bg-green-600/20 text-green-400'}`}>
+                        {d.status === 'OPEN' ? 'Ouvert' : 'Resolu'}
+                      </span>
+                      <span className="font-body text-f1-white/50 text-xs">
+                        {new Date(d.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <p className="font-racing text-f1-white italic">
+                      {d.transaction.ticket.grandPrix.name}
+                    </p>
+                    <p className="font-body text-f1-white/70 text-sm">
+                      Tribune {d.transaction.ticket.section} · Rang {d.transaction.ticket.row} · Place {d.transaction.ticket.seat}
+                    </p>
+                    <p className="font-body text-f1-white/50 text-xs">
+                      Acheteur : {d.transaction.buyerEmail}
+                    </p>
+                    <p className="font-body text-f1-white/50 text-xs">
+                      Vendeur : {d.transaction.ticket.seller.email}
+                    </p>
+                    {d.stripeRefundId && (
+                      <p className="font-body text-f1-white/40 text-xs">
+                        Remboursement Stripe : {d.stripeRefundId}
+                      </p>
+                    )}
+                  </div>
+                  {d.status === 'OPEN' && (
+                    <button
+                      type="button"
+                      disabled={resolvingId === d.id}
+                      onClick={() => handleResolveDispute(d.id)}
+                      className="bg-f1-white text-f1-carbon font-racing font-bold py-2 px-4 -skew-x-12 hover:bg-green-500 hover:text-f1-white disabled:opacity-50 transition-colors text-sm uppercase whitespace-nowrap"
+                    >
+                      <span className="inline-block skew-x-12">
+                        {resolvingId === d.id ? '...' : 'Marquer resolu'}
+                      </span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

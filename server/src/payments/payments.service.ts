@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketStatus, TransactionStatus } from '@prisma/client';
@@ -194,6 +194,69 @@ export class PaymentsService {
         imageUrl: ticket.imageUrl,
       },
     };
+  }
+
+  async validateTicket(transactionId: string, userId: string) {
+    const transaction = await this.prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: { ticket: { include: { grandPrix: true } } },
+    });
+
+    if (!transaction) throw new NotFoundException('Transaction non trouvee');
+    if (transaction.buyerId !== userId) throw new ForbiddenException('Non autorise');
+    if (transaction.buyerValidation !== 'PENDING') {
+      throw new BadRequestException('Validation deja effectuee');
+    }
+    if (new Date(transaction.ticket.grandPrix.date) > new Date()) {
+      throw new BadRequestException('Le Grand Prix n\'a pas encore eu lieu');
+    }
+
+    await this.prisma.transaction.update({
+      where: { id: transactionId },
+      data: { buyerValidation: 'VALID', validatedAt: new Date() },
+    });
+
+    return { success: true, status: 'VALID' };
+  }
+
+  async disputeTicket(transactionId: string, userId: string) {
+    const transaction = await this.prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: { ticket: { include: { grandPrix: true } } },
+    });
+
+    if (!transaction) throw new NotFoundException('Transaction non trouvee');
+    if (transaction.buyerId !== userId) throw new ForbiddenException('Non autorise');
+    if (transaction.buyerValidation !== 'PENDING') {
+      throw new BadRequestException('Validation deja effectuee');
+    }
+    if (new Date(transaction.ticket.grandPrix.date) > new Date()) {
+      throw new BadRequestException('Le Grand Prix n\'a pas encore eu lieu');
+    }
+
+    let stripeRefundId: string | null = null;
+    if (transaction.stripePaymentId) {
+      const refund = await this.stripe.refunds.create({
+        payment_intent: transaction.stripePaymentId,
+      });
+      stripeRefundId = refund.id;
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.transaction.update({
+        where: { id: transactionId },
+        data: {
+          buyerValidation: 'DISPUTED',
+          validatedAt: new Date(),
+          status: 'REFUNDED',
+        },
+      }),
+      this.prisma.dispute.create({
+        data: { transactionId, stripeRefundId },
+      }),
+    ]);
+
+    return { success: true, status: 'DISPUTED' };
   }
 
   async cancelPendingPurchase(ticketId: string) {

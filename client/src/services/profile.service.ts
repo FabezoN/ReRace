@@ -10,11 +10,15 @@ export interface ProfileUser {
   role: UserRole;
 }
 
+export type BuyerValidation = 'PENDING' | 'VALID' | 'DISPUTED';
+
 export interface PurchaseItem {
   id: string;
   amount: string;
   total: string;
   createdAt: string;
+  buyerValidation: BuyerValidation;
+  validatedAt: string | null;
   ticket: {
     id: string;
     section: string;
@@ -68,6 +72,16 @@ export const ProfileService = {
 
   deleteAccount: async (): Promise<{ message: string }> => {
     const response = await apiClient.delete<{ message: string }>('/profile');
+    return response.data;
+  },
+
+  validateTicket: async (transactionId: string): Promise<{ success: boolean; status: string }> => {
+    const response = await apiClient.post<{ success: boolean; status: string }>(`/payments/validate/${transactionId}`);
+    return response.data;
+  },
+
+  disputeTicket: async (transactionId: string): Promise<{ success: boolean; status: string }> => {
+    const response = await apiClient.post<{ success: boolean; status: string }>(`/payments/dispute/${transactionId}`);
     return response.data;
   },
 };

@@ -28,6 +28,17 @@ enum TransactionStatus {
   REFUNDED
 }
 
+enum BuyerValidation {
+  PENDING
+  VALID
+  DISPUTED
+}
+
+enum DisputeStatus {
+  OPEN
+  RESOLVED
+}
+
 model User {
   id          String   @id @default(uuid())
   email       String   @unique
@@ -37,9 +48,10 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  ticketsSelling Ticket[]      @relation("Seller")
-  ticketsBought  Transaction[] @relation("Buyer")
-  auditLogs      AuditLog[]
+  ticketsSelling    Ticket[]      @relation("Seller")
+  ticketsBought     Transaction[] @relation("Buyer")
+  auditLogs         AuditLog[]
+  disputesResolved  Dispute[]     @relation("DisputeResolver")
 }
 
 model GrandPrix {
@@ -89,13 +101,28 @@ model Transaction {
   status          TransactionStatus @default(PENDING)
   stripePaymentId String?
 
-  buyerId         String?
-  buyer           User?             @relation("Buyer", fields: [buyerId], references: [id])
-  buyerEmail      String
-  ticketId        String            @unique
-  ticket          Ticket            @relation(fields: [ticketId], references: [id])
+  buyerId          String?
+  buyer            User?             @relation("Buyer", fields: [buyerId], references: [id])
+  buyerEmail       String
+  ticketId         String            @unique
+  ticket           Ticket            @relation(fields: [ticketId], references: [id])
+  buyerValidation  BuyerValidation   @default(PENDING)
+  validatedAt      DateTime?
+  dispute          Dispute?
 
-  createdAt       DateTime          @default(now())
+  createdAt        DateTime          @default(now())
+}
+
+model Dispute {
+  id              String        @id @default(uuid())
+  transactionId   String        @unique
+  transaction     Transaction   @relation(fields: [transactionId], references: [id])
+  status          DisputeStatus @default(OPEN)
+  stripeRefundId  String?
+  resolvedAt      DateTime?
+  resolvedById    String?
+  resolvedBy      User?         @relation("DisputeResolver", fields: [resolvedById], references: [id])
+  createdAt       DateTime      @default(now())
 }
 
 model AuditLog {
