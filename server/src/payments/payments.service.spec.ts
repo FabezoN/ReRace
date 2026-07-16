@@ -511,6 +511,201 @@ describe('PaymentsService', () => {
     });
   });
 
+  // ─── handleWebhook() ──────────────────────────────────────────────────────
+
+  describe('handleWebhook()', () => {
+    const MOCK_PAYLOAD   = Buffer.from('{"type":"checkout.session.completed"}');
+    const MOCK_SIGNATURE = 'stripe-sig-test';
+
+    beforeEach(() => {
+      mockConfigService.get.mockImplementation((key: string) => {
+        const config: Record<string, string> = {
+          STRIPE_SECRET_KEY:    'sk_test_fake_key_for_unit_tests',
+          FRONTEND_URL:         'http://localhost:5173',
+          STRIPE_WEBHOOK_SECRET:'whsec_test_secret',
+        };
+        return config[key] ?? null;
+      });
+    });
+
+    it('❌ doit lever BadRequestException si le webhook secret nest pas configuré', async () => {
+      mockConfigService.get.mockImplementation((key: string) =>
+        key === 'STRIPE_SECRET_KEY' ? 'sk_test_fake_key_for_unit_tests' : null,
+      );
+
+      await expect(
+        service.handleWebhook(MOCK_PAYLOAD, MOCK_SIGNATURE),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('❌ doit lever BadRequestException si la signature Stripe est invalide', async () => {
+      mockStripeInstance.webhooks.constructEvent.mockImplementation(() => {
+        throw new Error('Invalid signature');
+      });
+
+      await expect(
+        service.handleWebhook(MOCK_PAYLOAD, MOCK_SIGNATURE),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.handleWebhook(MOCK_PAYLOAD, MOCK_SIGNATURE),
+      ).rejects.toThrow('Webhook Error: Invalid signature');
+    });
+
+    it('✅ doit traiter un événement checkout.session.completed et créer la transaction', async () => {
+      mockStripeInstance.webhooks.constructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id:             'cs_test_monaco_2026',
+            payment_intent: 'pi_test_monaco_2026',
+            payment_status: 'paid',
+            metadata: {
+              ticketId:   TICKET_ID,
+              buyerEmail: BUYER_EMAIL,
+              amount:     '200',
+              fees:       '10',
+              total:      '210',
+            },
+          },
+        },
+      });
+
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.transaction.create.mockResolvedValue({});
+      mockPrisma.ticket.update.mockResolvedValue({});
+
+      const result = await service.handleWebhook(MOCK_PAYLOAD, MOCK_SIGNATURE);
+
+      expect(result).toEqual({ received: true });
+      expect(mockPrisma.transaction.create).toHaveBeenCalled();
+      expect(mockPrisma.ticket.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: TicketStatus.SOLD } }),
+      );
+    });
+
+    it('✅ doit lier la transaction à un compte existant si email correspond', async () => {
+      const existingUser = { id: BUYER_ID, email: BUYER_EMAIL };
+      mockStripeInstance.webhooks.constructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            payment_intent: 'pi_test',
+            metadata: { ticketId: TICKET_ID, buyerEmail: BUYER_EMAIL, amount: '200', fees: '10', total: '210' },
+          },
+        },
+      });
+      mockPrisma.user.findUnique.mockResolvedValue(existingUser);
+      mockPrisma.transaction.create.mockResolvedValue({});
+      mockPrisma.ticket.update.mockResolvedValue({});
+
+      await service.handleWebhook(MOCK_PAYLOAD, MOCK_SIGNATURE);
+
+      expect(mockPrisma.transaction.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ buyerId: BUYER_ID }) }),
+      );
+    });
+
+    it('✅ doit ignorer les événements non gérés', async () => {
+      mockStripeInstance.webhooks.constructEvent.mockReturnValue({
+        type: 'payment_intent.created',
+        data: { object: {} },
+      });
+
+      const result = await service.handleWebhook(MOCK_PAYLOAD, MOCK_SIGNATURE);
+
+      expect(result).toEqual({ received: true });
+      expect(mockPrisma.transaction.create).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── verifySession() ──────────────────────────────────────────────────────
+
+  describe('verifySession()', () => {
+    const SESSION_ID = 'cs_test_monaco_2026';
+
+    const MOCK_SESSION_PAID = {
+      id:             SESSION_ID,
+      payment_status: 'paid',
+      metadata: {
+        ticketId:   TICKET_ID,
+        buyerEmail: BUYER_EMAIL,
+        amount:     '200',
+        fees:       '10',
+        total:      '210',
+      },
+    };
+
+    const MOCK_TICKET_WITH_TRANSACTION = {
+      ...MOCK_TICKET_ON_SALE,
+      status:      TicketStatus.SOLD,
+      grandPrix:   MOCK_GRAND_PRIX,
+      transaction: { id: TRANSACTION_ID },
+    };
+
+    it('✅ doit retourner { success: false } si le paiement nest pas complété', async () => {
+      mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue({
+        ...MOCK_SESSION_PAID,
+        payment_status: 'unpaid',
+      });
+
+      const result = await service.verifySession(SESSION_ID);
+
+      expect(result).toEqual({ success: false });
+    });
+
+    it('✅ doit retourner { success: false } si ticketId est absent des metadata', async () => {
+      mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue({
+        ...MOCK_SESSION_PAID,
+        metadata: {},
+      });
+
+      const result = await service.verifySession(SESSION_ID);
+
+      expect(result).toEqual({ success: false });
+    });
+
+    it('✅ doit retourner { success: false } si le billet est introuvable en BDD', async () => {
+      mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue(MOCK_SESSION_PAID);
+      mockPrisma.ticket.findUnique.mockResolvedValue(null);
+
+      const result = await service.verifySession(SESSION_ID);
+
+      expect(result).toEqual({ success: false });
+    });
+
+    it('✅ doit retourner les détails du billet si la transaction est déjà en BDD', async () => {
+      mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue(MOCK_SESSION_PAID);
+      mockPrisma.ticket.findUnique.mockResolvedValue(MOCK_TICKET_WITH_TRANSACTION);
+
+      const result = await service.verifySession(SESSION_ID);
+
+      expect(result).toEqual({
+        success: true,
+        ticket: expect.objectContaining({
+          id:           TICKET_ID,
+          grandPrixName: MOCK_GRAND_PRIX.name,
+          section:      MOCK_TICKET_ON_SALE.section,
+        }),
+      });
+    });
+
+    it('✅ doit compléter la transaction si elle nexiste pas encore en BDD', async () => {
+      mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue(MOCK_SESSION_PAID);
+      mockPrisma.ticket.findUnique
+        .mockResolvedValueOnce({ ...MOCK_TICKET_WITH_TRANSACTION, transaction: null })
+        .mockResolvedValueOnce(MOCK_TICKET_WITH_TRANSACTION);
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.transaction.create.mockResolvedValue({});
+      mockPrisma.ticket.update.mockResolvedValue({});
+
+      const result = await service.verifySession(SESSION_ID);
+
+      expect(mockPrisma.transaction.create).toHaveBeenCalled();
+      expect(result).toEqual(expect.objectContaining({ success: true }));
+    });
+  });
+
   // ─── disputeTicket() ──────────────────────────────────────────────────────
 
   describe('disputeTicket()', () => {
