@@ -156,6 +156,9 @@ export default function ProfilePage() {
         <h2 className="font-racing text-xl text-f1-white italic uppercase mb-4">Informations personnelles</h2>
         {message && (
           <div
+            role={message.type === 'error' ? 'alert' : 'status'}
+            aria-live="polite"
+            id="profile-message"
             className={`mb-4 px-4 py-3 rounded font-body text-sm ${
               message.type === 'success'
                 ? 'bg-f1-green/20 border border-f1-green text-f1-white'
@@ -168,8 +171,9 @@ export default function ProfilePage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block font-body text-f1-white/80 text-sm font-medium mb-2">Prénom</label>
+              <label htmlFor="profile-firstname" className="block font-body text-f1-white/80 text-sm font-medium mb-2">Prénom</label>
               <input
+                id="profile-firstname"
                 type="text"
                 value={form.firstName}
                 onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
@@ -179,8 +183,9 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <label className="block font-body text-f1-white/80 text-sm font-medium mb-2">Nom</label>
+              <label htmlFor="profile-lastname" className="block font-body text-f1-white/80 text-sm font-medium mb-2">Nom</label>
               <input
+                id="profile-lastname"
                 type="text"
                 value={form.lastName}
                 onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
@@ -191,8 +196,9 @@ export default function ProfilePage() {
             </div>
           </div>
           <div>
-            <label className="block font-body text-f1-white/80 text-sm font-medium mb-2">Email</label>
+            <label htmlFor="profile-email" className="block font-body text-f1-white/80 text-sm font-medium mb-2">Email</label>
             <input
+              id="profile-email"
               type="email"
               value={user.email}
               readOnly
@@ -201,10 +207,11 @@ export default function ProfilePage() {
             <p className="font-body text-f1-white/50 text-xs mt-1">L'email ne peut pas être modifié.</p>
           </div>
           <div>
-            <label className="block font-body text-f1-white/80 text-sm font-medium mb-2">
+            <label htmlFor="profile-iban" className="block font-body text-f1-white/80 text-sm font-medium mb-2">
               IBAN <span className="text-f1-white/40 font-normal">(pour recevoir vos paiements en tant que vendeur)</span>
             </label>
             <input
+              id="profile-iban"
               type="text"
               placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX"
               readOnly

@@ -58,31 +58,37 @@ export default function AuthLoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
-            <div className="bg-f1-red/20 border border-f1-red text-f1-white font-body text-sm px-4 py-3 rounded">
+            <div role="alert" id="login-error" className="bg-f1-red/20 border border-f1-red text-f1-white font-body text-sm px-4 py-3 rounded">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block font-body text-f1-white/80 text-sm font-medium mb-2">Email</label>
+            <label htmlFor="login-email" className="block font-body text-f1-white/80 text-sm font-medium mb-2">Email</label>
             <input
+              id="login-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              aria-invalid={!!error}
+              aria-describedby={error ? 'login-error' : undefined}
               className="w-full bg-f1-carbon border-2 border-f1-asphalt rounded px-4 py-3 text-f1-white font-body placeholder:text-f1-white/40 focus:outline-none focus:border-f1-red transition-colors"
               placeholder="votre@email.com"
             />
           </div>
 
           <div>
-            <label className="block font-body text-f1-white/80 text-sm font-medium mb-2">Mot de passe</label>
+            <label htmlFor="login-password" className="block font-body text-f1-white/80 text-sm font-medium mb-2">Mot de passe</label>
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
+              aria-invalid={!!error}
+              aria-describedby={error ? 'login-error' : undefined}
               className="w-full bg-f1-carbon border-2 border-f1-asphalt rounded px-4 py-3 text-f1-white font-body placeholder:text-f1-white/40 focus:outline-none focus:border-f1-red transition-colors"
               placeholder="••••••••"
             />

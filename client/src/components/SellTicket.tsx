@@ -107,15 +107,16 @@ export default function SellTicket() {
       <h2 className="text-3xl font-bold text-white mb-6 italic">VENDRE UN BILLET</h2>
       
       {error && (
-        <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded mb-4">
+        <div role="alert" id="sell-error" className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded mb-4">
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label className="block text-gray-400 mb-2">Grand Prix</label>
-          <select 
+          <label htmlFor="sell-grandprix" className="block text-gray-400 mb-2">Grand Prix</label>
+          <select
+            id="sell-grandprix"
             className="w-full p-3 rounded bg-[#15151E] text-white border border-gray-600 focus:border-[#FF1801] outline-none"
             value={formData.grandPrixId}
             onChange={(e) => setFormData({...formData, grandPrixId: e.target.value})}
@@ -131,8 +132,9 @@ export default function SellTicket() {
         </div>
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="block text-gray-400 mb-2">Tribune / Section</label>
-            <input 
+            <label htmlFor="sell-section" className="block text-gray-400 mb-2">Tribune / Section</label>
+            <input
+              id="sell-section"
               type="text" placeholder="Ex: Gold A"
               className="w-full p-3 rounded bg-[#15151E] text-white border border-gray-600 focus:border-[#FF1801] outline-none"
               value={formData.section}
@@ -141,8 +143,9 @@ export default function SellTicket() {
             />
           </div>
           <div>
-            <label className="block text-gray-400 mb-2">Rang</label>
-            <input 
+            <label htmlFor="sell-rang" className="block text-gray-400 mb-2">Rang</label>
+            <input
+              id="sell-rang"
               type="number"
               min={1}
               step={1}
@@ -158,8 +161,9 @@ export default function SellTicket() {
             />
           </div>
           <div>
-            <label className="block text-gray-400 mb-2">Siège</label>
-            <input 
+            <label htmlFor="sell-siege" className="block text-gray-400 mb-2">Siège</label>
+            <input
+              id="sell-siege"
               type="number"
               min={1}
               step={1}
@@ -176,8 +180,9 @@ export default function SellTicket() {
           </div>
         </div>
         <div>
-          <label className="block text-gray-400 mb-2">Prix de vente (€)</label>
-          <input 
+          <label htmlFor="sell-prix" className="block text-gray-400 mb-2">Prix de vente (€)</label>
+          <input
+            id="sell-prix"
             type="number" min="1" step="0.01" placeholder="0.00"
             className="w-full p-3 rounded bg-[#15151E] text-white border border-gray-600 focus:border-[#FF1801] outline-none text-xl font-bold"
             value={formData.price}
@@ -186,14 +191,17 @@ export default function SellTicket() {
           />
         </div>
         <div>
-          <label className="block text-gray-400 mb-2">
+          <label htmlFor="sell-photo" className="block text-gray-400 mb-2">
             Photo de la vue (justificatif du billet) <span className="text-red-500">*</span>
           </label>
-          <input 
-            type="file" 
+          <input
+            id="sell-photo"
+            type="file"
             accept="image/*, application/pdf"
             onChange={handleFileUpload}
             disabled={uploading}
+            aria-invalid={!!error}
+            aria-describedby={error ? 'sell-error' : undefined}
             className="w-full p-3 rounded bg-[#15151E] text-white border border-gray-600 focus:border-[#FF1801] outline-none file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-[#FF1801] file:text-white hover:file:bg-red-700"
             required
           />

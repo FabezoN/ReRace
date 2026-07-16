@@ -81,35 +81,41 @@ export default function LoginModal({ onClose }: LoginModalProps) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded">
+            <div role="alert" id="modal-error" className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-gray-300 text-sm font-medium mb-2">
+            <label htmlFor="modal-email" className="block text-gray-300 text-sm font-medium mb-2">
               Email
             </label>
             <input
+              id="modal-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              aria-invalid={!!error}
+              aria-describedby={error ? 'modal-error' : undefined}
               className="w-full bg-[#1A1A24] border border-gray-700 rounded px-4 py-2 text-white focus:outline-none focus:border-[#FF1801]"
               placeholder="votre@email.com"
             />
           </div>
 
           <div>
-            <label className="block text-gray-300 text-sm font-medium mb-2">
+            <label htmlFor="modal-password" className="block text-gray-300 text-sm font-medium mb-2">
               Mot de passe
             </label>
             <input
+              id="modal-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
+              aria-invalid={!!error}
+              aria-describedby={error ? 'modal-error' : undefined}
               className="w-full bg-[#1A1A24] border border-gray-700 rounded px-4 py-2 text-white focus:outline-none focus:border-[#FF1801]"
               placeholder="••••••••"
             />

@@ -195,7 +195,7 @@ Si l'acheteur ne valide pas dans les **7 jours après le GP**, une tâche cron a
 Deux workflows GitHub Actions :
 
 **Backend** (`.github/workflows/deploy-backend.yml`)
-1. Tests Jest (54 tests)
+1. Tests Jest (122 tests unitaires, 12 suites)
 2. Build image Docker multi-stage
 3. Push sur Google Artifact Registry
 4. Déploiement sur **Google Cloud Run**
@@ -223,7 +223,7 @@ Configuration : variable `SENTRY_DSN` dans `.env` et sur Cloud Run.
 
 ```bash
 cd server
-npm run test          # 54 tests unitaires
+npm run test          # 122 tests unitaires (12 suites)
 npm run test:cov      # avec couverture de code
 ```
 
@@ -279,7 +279,7 @@ ReRace/
 | Storage | Supabase Storage |
 | Monitoring | Sentry (@sentry/nestjs) |
 | Infra | Docker, Google Cloud Run, GitHub Actions, Render |
-| Tests | Jest (unitaires, 54 tests) |
+| Tests | Jest (unitaires, 122 tests, 12 suites) |
 
 ---
 
