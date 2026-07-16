@@ -57,14 +57,14 @@ export default function SellTicket() {
         });
 
       if (uploadError) {
-        console.error('❌ Erreur upload Supabase:', uploadError);
+        console.error('Erreur upload Supabase:', uploadError);
         throw uploadError;
       }
       const { data } = supabase.storage.from('tickets').getPublicUrl(fileName);
       setFormData({ ...formData, imageUrl: data.publicUrl });
       
     } catch (error: any) {
-      console.error('❌ Erreur handleFileUpload:', error);
+      console.error('Erreur handleFileUpload:', error);
       setError('Erreur upload: ' + error.message);
     } finally {
       setUploading(false);

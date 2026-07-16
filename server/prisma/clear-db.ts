@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function clearDatabase() {
-  console.log('🧹 Début du nettoyage de la base de données...');
+  console.log(' Début du nettoyage de la base de données...');
 
   try {
     // Supprimer dans l'ordre pour respecter les contraintes de clés étrangères
@@ -22,9 +22,9 @@ async function clearDatabase() {
     console.log('Suppression des utilisateurs...');
     await prisma.user.deleteMany();
 
-    console.log('✅ Base de données vidée avec succès !');
+    console.log(' Base de données vidée avec succès !');
   } catch (error) {
-    console.error('❌ Erreur lors du nettoyage:', error);
+    console.error(' Erreur lors du nettoyage:', error);
     throw error;
   } finally {
     await prisma.$disconnect();

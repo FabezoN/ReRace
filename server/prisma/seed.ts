@@ -3,10 +3,10 @@ import { PrismaClient, Role, TicketStatus } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Début du seed...');
+  console.log(' Début du seed...');
 
   // Nettoyer la base de données (optionnel - à commenter en production)
-  console.log('🧹 Nettoyage de la base de données...');
+  console.log(' Nettoyage de la base de données...');
   await prisma.transaction.deleteMany();
   await prisma.ticket.deleteMany();
   await prisma.grandPrix.deleteMany();
@@ -14,7 +14,7 @@ async function main() {
   await prisma.user.deleteMany();
 
   // 1. Créer des utilisateurs
-  console.log('👥 Création des utilisateurs...');
+  console.log(' Création des utilisateurs...');
   const user1 = await prisma.user.create({
     data: {
       email: 'john.doe@example.com',
@@ -42,10 +42,10 @@ async function main() {
     },
   });
 
-  console.log(`✅ ${3} utilisateurs créés`);
+  console.log(` ${3} utilisateurs créés`);
 
   // 2. Créer des Grands Prix
-  console.log('🏎️  Création des Grands Prix...');
+  console.log(' Création des Grands Prix...');
   const monacoGP = await prisma.grandPrix.create({
     data: {
       externalId: 'monaco-2024',
@@ -82,10 +82,10 @@ async function main() {
     },
   });
 
-  console.log(`✅ ${3} Grands Prix créés`);
+  console.log(` ${3} Grands Prix créés`);
 
   // 3. Créer des billets
-  console.log('🎫 Création des billets...');
+  console.log(' Création des billets...');
   
   // Billets pour Monaco
   await prisma.ticket.create({
@@ -172,10 +172,10 @@ async function main() {
     },
   });
 
-  console.log(`✅ ${6} billets créés`);
+  console.log(` ${6} billets créés`);
 
   // 4. Créer quelques logs d'audit
-  console.log('📝 Création des logs d\'audit...');
+  console.log(' Création des logs d\'audit...');
   await prisma.auditLog.create({
     data: {
       action: 'TICKET_CREATED',
@@ -193,14 +193,14 @@ async function main() {
     },
   });
 
-  console.log(`✅ ${2} logs d'audit créés`);
+  console.log(` ${2} logs d'audit créés`);
 
-  console.log('✨ Seed terminé avec succès !');
+  console.log(' Seed terminé avec succès !');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Erreur lors du seed:', e);
+    console.error(' Erreur lors du seed:', e);
     process.exit(1);
   })
   .finally(async () => {

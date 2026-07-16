@@ -1,20 +1,9 @@
-/**
- * TESTS UNITAIRES — AppController (stub corrigé)
- *
- * Cause de l'échec d'origine :
- *   AppController dépend de AppService ET PrismaService (pour les routes /profile).
- *   Le stub ne fournissait que AppService → NestJS ne pouvait pas résoudre PrismaService.
- *
- * Correctif : mocker les deux dépendances.
- */
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
-
-// ─── Données fictives ─────────────────────────────────────────────────────────
 
 const USER_ID  = 'user-uuid-0001';
 const GP_DATE  = new Date('2026-05-24');
@@ -35,8 +24,6 @@ const MOCK_TRANSACTION = {
   ticket: MOCK_TICKET,
 };
 
-// ─── Mock Prisma ─────────────────────────────────────────────────────────────
-
 const mockPrisma = {
   user: {
     findUnique: jest.fn(),
@@ -56,8 +43,6 @@ const mockPrisma = {
   },
 };
 
-// ─── Suite de tests ───────────────────────────────────────────────────────────
-
 describe('AppController', () => {
   let appController: AppController;
 
@@ -74,22 +59,18 @@ describe('AppController', () => {
     jest.clearAllMocks();
   });
 
-  it('✅ le contrôleur doit être instancié correctement', () => {
+  it('le contrôleur doit être instancié correctement', () => {
     expect(appController).toBeDefined();
   });
 
-  // ─── GET / ────────────────────────────────────────────────────────────────
-
   describe('GET / — health check', () => {
-    it('✅ doit retourner "Hello World!"', () => {
+    it('doit retourner "Hello World!"', () => {
       expect(appController.getHello()).toBe('Hello World!');
     });
   });
 
-  // ─── GET /profile ─────────────────────────────────────────────────────────
-
   describe('getProfile()', () => {
-    it('✅ doit retourner le profil de l\'utilisateur connecté', async () => {
+    it('doit retourner le profil de l\'utilisateur connecté', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(MOCK_DB_USER);
 
       const result = await appController.getProfile({ id: USER_ID });
@@ -100,7 +81,7 @@ describe('AppController', () => {
       );
     });
 
-    it('✅ doit retourner { user: null } si l\'utilisateur n\'existe pas en BDD', async () => {
+    it('doit retourner { user: null } si l\'utilisateur n\'existe pas en BDD', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
 
       const result = await appController.getProfile({ id: USER_ID });
@@ -109,10 +90,8 @@ describe('AppController', () => {
     });
   });
 
-  // ─── PATCH /profile ───────────────────────────────────────────────────────
-
   describe('updateProfile()', () => {
-    it('✅ doit mettre à jour prénom et nom', async () => {
+    it('doit mettre à jour prénom et nom', async () => {
       const updated = { ...MOCK_DB_USER, firstName: 'Lewis', lastName: 'Hamilton' };
       mockPrisma.user.update.mockResolvedValue(updated);
 
@@ -130,7 +109,7 @@ describe('AppController', () => {
       );
     });
 
-    it('✅ doit ne mettre à jour que les champs fournis (firstName seul)', async () => {
+    it('doit ne mettre à jour que les champs fournis (firstName seul)', async () => {
       const updated = { ...MOCK_DB_USER, firstName: 'Lewis' };
       mockPrisma.user.update.mockResolvedValue(updated);
 
@@ -146,10 +125,8 @@ describe('AppController', () => {
     });
   });
 
-  // ─── GET /profile/purchases ───────────────────────────────────────────────
-
   describe('getPurchases()', () => {
-    it('✅ doit retourner l\'historique des achats de l\'utilisateur', async () => {
+    it('doit retourner l\'historique des achats de l\'utilisateur', async () => {
       mockPrisma.transaction.findMany.mockResolvedValue([MOCK_TRANSACTION]);
 
       const result = await appController.getPurchases({ id: USER_ID });
@@ -160,7 +137,7 @@ describe('AppController', () => {
       );
     });
 
-    it('✅ doit retourner un tableau vide si aucun achat', async () => {
+    it('doit retourner un tableau vide si aucun achat', async () => {
       mockPrisma.transaction.findMany.mockResolvedValue([]);
 
       const result = await appController.getPurchases({ id: USER_ID });
@@ -169,10 +146,8 @@ describe('AppController', () => {
     });
   });
 
-  // ─── GET /profile/listings ────────────────────────────────────────────────
-
   describe('getListings()', () => {
-    it('✅ doit retourner les billets mis en vente et vendus par l\'utilisateur', async () => {
+    it('doit retourner les billets mis en vente et vendus par l\'utilisateur', async () => {
       mockPrisma.ticket.findMany.mockResolvedValue([MOCK_TICKET]);
 
       const result = await appController.getListings({ id: USER_ID });
@@ -185,7 +160,7 @@ describe('AppController', () => {
       );
     });
 
-    it('✅ doit retourner un tableau vide si aucun billet mis en vente', async () => {
+    it('doit retourner un tableau vide si aucun billet mis en vente', async () => {
       mockPrisma.ticket.findMany.mockResolvedValue([]);
 
       const result = await appController.getListings({ id: USER_ID });
@@ -194,10 +169,8 @@ describe('AppController', () => {
     });
   });
 
-  // ─── DELETE /profile ──────────────────────────────────────────────────────
-
   describe('deleteAccount()', () => {
-    it('✅ doit supprimer le compte si l\'utilisateur n\'a pas de billets en vente', async () => {
+    it('doit supprimer le compte si l\'utilisateur n\'a pas de billets en vente', async () => {
       mockPrisma.ticket.count.mockResolvedValue(0);
       mockPrisma.transaction.updateMany.mockResolvedValue({});
       mockPrisma.auditLog.deleteMany.mockResolvedValue({});
@@ -209,7 +182,7 @@ describe('AppController', () => {
       expect(mockPrisma.user.delete).toHaveBeenCalledWith({ where: { id: USER_ID } });
     });
 
-    it('❌ doit lever BadRequestException si l\'utilisateur a des billets en vente', async () => {
+    it('doit lever BadRequestException si l\'utilisateur a des billets en vente', async () => {
       mockPrisma.ticket.count.mockResolvedValue(3);
 
       await expect(
@@ -221,7 +194,7 @@ describe('AppController', () => {
       ).rejects.toThrow('Impossible de supprimer le compte');
     });
 
-    it('✅ doit anonymiser les transactions avant de supprimer le compte', async () => {
+    it('doit anonymiser les transactions avant de supprimer le compte', async () => {
       mockPrisma.ticket.count.mockResolvedValue(0);
       mockPrisma.transaction.updateMany.mockResolvedValue({});
       mockPrisma.auditLog.deleteMany.mockResolvedValue({});

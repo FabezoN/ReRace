@@ -1,20 +1,9 @@
-/**
- * TESTS UNITAIRES — JwtAuthGuard
- *
- * Garantit que l'authentification JWT est correctement appliquée :
- *   - Absence de header Authorization → UnauthorizedException "Token manquant"
- *   - Header non-Bearer → UnauthorizedException
- *   - Token valide → user attaché à la requête, canActivate retourne true
- *   - Token expiré ou invalide → UnauthorizedException "Token invalide ou expiré"
- */
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { ExecutionContext } from '@nestjs/common';
-
-// ─── Mock JwtStrategy ─────────────────────────────────────────────────────────
 
 const mockJwtStrategy = {
   validateTokenDirectly: jest.fn(),
@@ -23,8 +12,6 @@ const mockJwtStrategy = {
 const mockModuleRef = {
   get: jest.fn().mockReturnValue(mockJwtStrategy),
 };
-
-// ─── Helper : crée un ExecutionContext simulé avec requête mutable ─────────────
 
 const createMockContext = (headers: Record<string, string>): { context: ExecutionContext; request: any } => {
   const request = { headers };
@@ -35,8 +22,6 @@ const createMockContext = (headers: Record<string, string>): { context: Executio
   } as unknown as ExecutionContext;
   return { context, request };
 };
-
-// ─── Suite de tests ───────────────────────────────────────────────────────────
 
 describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
@@ -54,25 +39,25 @@ describe('JwtAuthGuard', () => {
     mockModuleRef.get.mockReturnValue(mockJwtStrategy);
   });
 
-  it('✅ le guard doit être instancié correctement', () => {
+  it('le guard doit être instancié correctement', () => {
     expect(guard).toBeDefined();
   });
 
-  it('❌ doit lever UnauthorizedException si aucun header Authorization n\'est présent', async () => {
+  it('doit lever UnauthorizedException si aucun header Authorization n\'est présent', async () => {
     const { context } = createMockContext({});
 
     await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
     await expect(guard.canActivate(context)).rejects.toThrow('Token manquant');
   });
 
-  it('❌ doit lever UnauthorizedException si le header n\'est pas du format Bearer', async () => {
+  it('doit lever UnauthorizedException si le header n\'est pas du format Bearer', async () => {
     const { context } = createMockContext({ authorization: 'Basic dXNlcjpwYXNz' });
 
     await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
     await expect(guard.canActivate(context)).rejects.toThrow('Token manquant');
   });
 
-  it('✅ doit authentifier et attacher l\'utilisateur à la requête si le token est valide', async () => {
+  it('doit authentifier et attacher l\'utilisateur à la requête si le token est valide', async () => {
     const mockUser = { id: 'user-uuid-001', email: 'max@rerace.io', role: 'USER' };
     mockJwtStrategy.validateTokenDirectly.mockResolvedValue(mockUser);
 
@@ -85,7 +70,7 @@ describe('JwtAuthGuard', () => {
     expect(mockJwtStrategy.validateTokenDirectly).toHaveBeenCalledWith('valid.jwt.token');
   });
 
-  it('❌ doit lever UnauthorizedException si la validation du token lève une erreur', async () => {
+  it('doit lever UnauthorizedException si la validation du token lève une erreur', async () => {
     mockJwtStrategy.validateTokenDirectly.mockRejectedValue(new Error('jwt expired'));
     const { context } = createMockContext({ authorization: 'Bearer expired.jwt.token' });
 
@@ -93,7 +78,7 @@ describe('JwtAuthGuard', () => {
     await expect(guard.canActivate(context)).rejects.toThrow('Token invalide ou expiré');
   });
 
-  it('❌ doit lever UnauthorizedException si le token est malformé', async () => {
+  it('doit lever UnauthorizedException si le token est malformé', async () => {
     mockJwtStrategy.validateTokenDirectly.mockRejectedValue(new Error('invalid token'));
     const { context } = createMockContext({ authorization: 'Bearer not-a-real-token' });
 

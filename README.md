@@ -13,7 +13,7 @@ Plateforme sécurisée de **revente et achat de billets de Formule 1**, avec :
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 - **`/client`** : Frontend React 19 + TypeScript + Vite + Tailwind CSS
   - Routage avec **React Router**
@@ -42,7 +42,7 @@ Plateforme sécurisée de **revente et achat de billets de Formule 1**, avec :
 
 ---
 
-## 📋 Prérequis
+## Prérequis
 
 - Node.js **20+**
 - npm
@@ -53,7 +53,7 @@ Plateforme sécurisée de **revente et achat de billets de Formule 1**, avec :
 
 ---
 
-## ⚙️ Configuration Backend (`/server`)
+## Configuration Backend (`/server`)
 
 ```bash
 cd server
@@ -79,7 +79,7 @@ NODE_ENV=development
 
 ---
 
-## 🐳 Environnement hybride (Docker local + Supabase)
+## Environnement hybride (Docker local + Supabase)
 
 Un `docker-compose.yml` à la racine lance une base **PostgreSQL locale** pour l'environnement école (réseau bloqué).
 
@@ -113,7 +113,7 @@ npm run start:dev
 
 ---
 
-## 🌐 Configuration Frontend (`/client`)
+## Configuration Frontend (`/client`)
 
 ```bash
 cd client
@@ -133,7 +133,7 @@ VITE_STRIPE_PUBLISHABLE_KEY=
 
 ---
 
-## 🧭 Routage Frontend
+## Routage Frontend
 
 | Route | Description | Auth |
 |---|---|---|
@@ -149,7 +149,7 @@ VITE_STRIPE_PUBLISHABLE_KEY=
 
 ---
 
-## 💳 Paiement & Billets
+## Paiement & Billets
 
 - **Achat** : session Stripe Checkout avec frais de service 5%, billet en `PENDING`
 - **Webhook** : à la confirmation, transaction `COMPLETED`, billet `SOLD`
@@ -166,7 +166,7 @@ Si l'acheteur ne valide pas dans les **7 jours après le GP**, une tâche cron a
 
 ---
 
-## 👤 Espace Utilisateur
+## Espace Utilisateur
 
 - Modifier prénom / nom
 - Voir l'historique des achats (ticket, Grand Prix, statut de validation)
@@ -175,7 +175,7 @@ Si l'acheteur ne valide pas dans les **7 jours après le GP**, une tâche cron a
 
 ---
 
-## 🛡️ Sécurité (OWASP Top 10)
+## Sécurité (OWASP Top 10)
 
 | Mesure | Couverture |
 |---|---|
@@ -190,7 +190,7 @@ Si l'acheteur ne valide pas dans les **7 jours après le GP**, une tâche cron a
 
 ---
 
-## 🚀 CI/CD & Déploiement
+## CI/CD & Déploiement
 
 Deux workflows GitHub Actions :
 
@@ -208,7 +208,7 @@ Les variables sensibles sont stockées dans GitHub Secrets et injectées à la f
 
 ---
 
-## 📊 Monitoring
+## Monitoring
 
 **Sentry** (`@sentry/nestjs`) capture automatiquement :
 - Erreurs non gérées (500)
@@ -219,7 +219,7 @@ Configuration : variable `SENTRY_DSN` dans `.env` et sur Cloud Run.
 
 ---
 
-## 🧪 Tests
+## Tests
 
 ```bash
 cd server
@@ -234,7 +234,7 @@ Couverture des services principaux :
 
 ---
 
-## 📁 Structure du Projet
+## Structure du Projet
 
 ```text
 ReRace/
@@ -267,7 +267,7 @@ ReRace/
 
 ---
 
-## 🛠️ Stack Technique
+## Stack Technique
 
 | Couche | Technologie |
 |---|---|
@@ -283,6 +283,6 @@ ReRace/
 
 ---
 
-## 📝 Licence
+## Licence
 
 Projet propriétaire — **Projet de Fin d'Étude**

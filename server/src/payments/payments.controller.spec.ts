@@ -1,12 +1,3 @@
-/**
- * TESTS UNITAIRES — PaymentsController (stub corrigé)
- *
- * Cause de l'échec d'origine :
- *   Le stub instanciait PaymentsController sans fournir PaymentsService
- *   → NestJS ne pouvait pas résoudre la dépendance.
- *
- * Correctif : injecter un mock de PaymentsService.
- */
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentsController } from './payments.controller';
@@ -41,39 +32,31 @@ describe('PaymentsController', () => {
     jest.clearAllMocks();
   });
 
-  it('✅ le contrôleur doit être instancié correctement', () => {
+  it('le contrôleur doit être instancié correctement', () => {
     expect(controller).toBeDefined();
   });
 
-  it('✅ createCheckoutSession() doit déléguer au PaymentsService', async () => {
-    // Arrange
+  it('createCheckoutSession() doit déléguer au PaymentsService', async () => {
     const dto = { ticketId: TICKET_ID, email: BUYER_EMAIL };
 
-    // Act
     const result = await controller.createCheckoutSession(dto);
 
-    // Assert
     expect(mockPaymentsService.createCheckoutSession).toHaveBeenCalledWith(TICKET_ID, BUYER_EMAIL);
     expect(result).toMatchObject({ sessionId: SESSION_ID });
   });
 
-  it('✅ verifySession() doit déléguer au PaymentsService avec le bon sessionId', async () => {
-    // Arrange
+  it('verifySession() doit déléguer au PaymentsService avec le bon sessionId', async () => {
     mockPaymentsService.verifySession.mockResolvedValue({ success: true });
 
-    // Act
     const result = await controller.verifySession(SESSION_ID);
 
-    // Assert
     expect(mockPaymentsService.verifySession).toHaveBeenCalledWith(SESSION_ID);
     expect(result).toEqual({ success: true });
   });
 
-  it('✅ cancelPurchase() doit déléguer au PaymentsService', async () => {
-    // Act
+  it('cancelPurchase() doit déléguer au PaymentsService', async () => {
     const result = await controller.cancelPurchase(TICKET_ID);
 
-    // Assert
     expect(mockPaymentsService.cancelPendingPurchase).toHaveBeenCalledWith(TICKET_ID);
     expect(result).toEqual({ cancelled: true });
   });

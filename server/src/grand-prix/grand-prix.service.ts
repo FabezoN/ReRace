@@ -63,7 +63,7 @@ export class GrandPrixService {
 
   async syncFromJolpica(season: number = 2026) {
     try {
-      this.logger.log(`🔄 Synchronisation des Grands Prix de la saison ${season}...`);
+      this.logger.log(` Synchronisation des Grands Prix de la saison ${season}...`);
 
       const response = await axios.get<JolpicaResponse>(
         `https://api.jolpi.ca/ergast/f1/${season}/races`,
@@ -73,7 +73,7 @@ export class GrandPrixService {
       );
 
       const races = response.data.MRData.RaceTable.Races;
-      this.logger.log(`📥 ${races.length} courses récupérées depuis l'API`);
+      this.logger.log(` ${races.length} courses récupérées depuis l'API`);
 
       const results: any[] = [];
       const syncedExternalIds: string[] = [];
@@ -113,7 +113,7 @@ export class GrandPrixService {
         });
 
         results.push(grandPrix);
-        this.logger.log(`✅ ${grandPrix.name} synchronisé`);
+        this.logger.log(` ${grandPrix.name} synchronisé`);
       }
 
       // Supprimer les GP de cette saison absents de l'API (ex : Jeddah ajouté manuellement)
@@ -128,13 +128,13 @@ export class GrandPrixService {
       for (const orphan of orphans) {
         if (orphan.tickets.length === 0) {
           await this.prisma.grandPrix.delete({ where: { id: orphan.id } });
-          this.logger.log(`🗑️ GP supprimé (absent de l'API) : ${orphan.name}`);
+          this.logger.log(` GP supprimé (absent de l'API) : ${orphan.name}`);
         } else {
-          this.logger.warn(`⚠️ GP absent de l'API mais conservé (a des billets) : ${orphan.name}`);
+          this.logger.warn(` GP absent de l'API mais conservé (a des billets) : ${orphan.name}`);
         }
       }
 
-      this.logger.log(`✨ Synchronisation terminée : ${results.length} Grands Prix`);
+      this.logger.log(` Synchronisation terminée : ${results.length} Grands Prix`);
       return {
         success: true,
         count: results.length,

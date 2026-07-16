@@ -20,7 +20,7 @@ apiClient.interceptors.request.use(
     if (session?.access_token) {
       config.headers.Authorization = `Bearer ${session.access_token}`;
     } else {
-      console.warn('⚠️ Aucun token JWT disponible');
+      console.warn(' Aucun token JWT disponible');
     }
 
     if (config.data instanceof FormData) {
@@ -43,9 +43,9 @@ apiClient.interceptors.response.use(
       if (error.response.status === 401) {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-          console.warn('⚠️ Pas de session active');
+          console.warn(' Pas de session active');
         } else {
-          console.error('❌ Token JWT rejeté par le serveur. Vérifiez la configuration SUPABASE_URL dans server/.env');
+          console.error(' Token JWT rejeté par le serveur. Vérifiez la configuration SUPABASE_URL dans server/.env');
         }
       }
     } else if (error.request) {

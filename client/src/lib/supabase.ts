@@ -4,7 +4,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('⚠️ Variables Supabase manquantes dans .env');
+  console.warn(' Variables Supabase manquantes dans .env');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

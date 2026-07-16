@@ -1,18 +1,3 @@
-/**
- * TESTS UNITAIRES — PaymentsService
- *
- * Objectif : valider les règles métier critiques du processus d'achat :
- *   - Calcul correct des frais de service (commission 5%)
- *   - Rejet d'un achat sur un billet déjà vendu ou en attente
- *   - Rejet si l'acheteur est le vendeur
- *   - Validation du format d'email
- *   - Remise en vente d'un billet annulé
- *
- * Mocks :
- *   - PrismaService  → jest.fn() (pas de vraie BDD)
- *   - ConfigService  → retourne les clés d'environnement fictives
- *   - Stripe         → jest.mock('stripe') pour éviter tout appel réseau
- */
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
@@ -22,15 +7,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TicketStatus } from '@prisma/client';
 import Stripe from 'stripe';
 
-// ─── Mock de Stripe (aucun appel réseau) ────────────────────────────────────
 //
 // jest.mock est hissé (hoisted) avant les imports.
 // On déclare les fonctions mock dans ce bloc pour qu'elles soient accessibles
 // dans les tests via la référence à l'instance.
 
 jest.mock('stripe', () => jest.fn());
-
-// ─── Données fictives réalistes ───────────────────────────────────────────────
 
 const SELLER_ID    = 'a1b2c3d4-0000-4000-8000-111111111111';
 const BUYER_ID     = 'd4e5f6a7-0003-4003-8003-444444444444';
@@ -50,7 +32,6 @@ const MOCK_GRAND_PRIX = {
   imageUrl:    null,
 };
 
-/** Billet disponible à l'achat */
 const MOCK_TICKET_ON_SALE = {
   id:          TICKET_ID,
   grandPrixId: GP_ID,
@@ -70,13 +51,9 @@ const MOCK_TICKET_ON_SALE = {
   seller:      { id: SELLER_ID, email: SELLER_EMAIL, firstName: 'Charles', lastName: 'Leclerc' },
 };
 
-/** Billet déjà vendu */
 const MOCK_TICKET_SOLD = { ...MOCK_TICKET_ON_SALE, status: TicketStatus.SOLD };
 
-/** Billet en cours de paiement (session Stripe ouverte) */
 const MOCK_TICKET_PENDING = { ...MOCK_TICKET_ON_SALE, status: TicketStatus.PENDING };
-
-// ─── Mocks des dépendances ────────────────────────────────────────────────────
 
 const TRANSACTION_ID = 'e1f2a3b4-0004-4004-8004-555555555555';
 
@@ -129,8 +106,6 @@ const mockConfigService = {
   }),
 };
 
-// ─── Suite de tests ───────────────────────────────────────────────────────────
-
 describe('PaymentsService', () => {
   let service: PaymentsService;
 
@@ -142,7 +117,6 @@ describe('PaymentsService', () => {
   };
 
   beforeEach(async () => {
-    // Arrange : configurer l'objet Stripe simulé avant chaque test
     mockStripeInstance = {
       checkout: {
         sessions: {
@@ -185,26 +159,15 @@ describe('PaymentsService', () => {
     });
   });
 
-  it('✅ le service doit être instancié correctement', () => {
+  it('le service doit être instancié correctement', () => {
     expect(service).toBeDefined();
   });
 
-  // ─── createCheckoutSession() ───────────────────────────────────────────────
-
   describe('createCheckoutSession()', () => {
 
-    // ── Scénario 1 : achat réussi & calcul des frais ─────────────────────────
+    it('doit calculer correctement les frais de service (commission 5%)', async () => {
+      
 
-    it('✅ doit calculer correctement les frais de service (commission 5%)', async () => {
-      /**
-       * Règle métier : frais = arrondi(prix × 5%) — plateforme ReRace
-       *
-       * Exemple avec un billet à 200 € :
-       *   fees  = Math.round(200 × 0.05 × 100) / 100 = 10.00 €
-       *   total = 200.00 + 10.00 = 210.00 €
-       */
-
-      // Arrange
       mockPrisma.ticket.findUnique.mockResolvedValue(MOCK_TICKET_ON_SALE);
       mockPrisma.ticket.update.mockResolvedValue({ ...MOCK_TICKET_ON_SALE, status: TicketStatus.PENDING });
       mockStripeInstance.checkout.sessions.create.mockResolvedValue({
@@ -212,10 +175,8 @@ describe('PaymentsService', () => {
         url: 'https://checkout.stripe.com/pay/cs_test_monaco_2026',
       });
 
-      // Act
       await service.createCheckoutSession(TICKET_ID, BUYER_EMAIL);
 
-      // Assert : les métadonnées envoyées à Stripe reflètent le bon calcul
       expect(mockStripeInstance.checkout.sessions.create).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: expect.objectContaining({
@@ -227,23 +188,17 @@ describe('PaymentsService', () => {
       );
     });
 
-    it('✅ doit marquer le billet PENDING avant de créer la session Stripe', async () => {
-      /**
-       * Règle métier : on réserve le billet (PENDING) avant d'ouvrir la session
-       * de paiement pour éviter une double vente concurrente.
-       */
+    it('doit marquer le billet PENDING avant de créer la session Stripe', async () => {
+      
 
-      // Arrange
       mockPrisma.ticket.findUnique.mockResolvedValue(MOCK_TICKET_ON_SALE);
       mockPrisma.ticket.update.mockResolvedValue({ ...MOCK_TICKET_ON_SALE, status: TicketStatus.PENDING });
       mockStripeInstance.checkout.sessions.create.mockResolvedValue({
         id: 'cs_test_monaco_2026', url: 'https://checkout.stripe.com/pay/cs_test_monaco_2026',
       });
 
-      // Act
       await service.createCheckoutSession(TICKET_ID, BUYER_EMAIL);
 
-      // Assert : update vers PENDING appelé AVANT la création de la session Stripe
       const updateOrder  = mockPrisma.ticket.update.mock.invocationCallOrder[0];
       const stripeOrder  = mockStripeInstance.checkout.sessions.create.mock.invocationCallOrder[0];
       expect(updateOrder).toBeLessThan(stripeOrder);
@@ -255,8 +210,7 @@ describe('PaymentsService', () => {
       );
     });
 
-    it('✅ doit retourner sessionId et url après création de la session Stripe', async () => {
-      // Arrange
+    it('doit retourner sessionId et url après création de la session Stripe', async () => {
       mockPrisma.ticket.findUnique.mockResolvedValue(MOCK_TICKET_ON_SALE);
       mockPrisma.ticket.update.mockResolvedValue({});
       mockStripeInstance.checkout.sessions.create.mockResolvedValue({
@@ -264,28 +218,19 @@ describe('PaymentsService', () => {
         url: 'https://checkout.stripe.com/pay/cs_test_monaco_2026',
       });
 
-      // Act
       const result = await service.createCheckoutSession(TICKET_ID, BUYER_EMAIL);
 
-      // Assert
       expect(result).toEqual({
         sessionId: 'cs_test_monaco_2026',
         url:       'https://checkout.stripe.com/pay/cs_test_monaco_2026',
       });
     });
 
-    // ── Scénario 2 : billet déjà vendu ou en attente ─────────────────────────
+    it('doit lever BadRequestException si le billet est déjà VENDU (SOLD)', async () => {
+      
 
-    it('❌ doit lever BadRequestException si le billet est déjà VENDU (SOLD)', async () => {
-      /**
-       * Règle métier critique : un billet vendu ne peut pas être acheté à nouveau.
-       * Cette vérification protège contre les tentatives frauduleuses de double achat.
-       */
-
-      // Arrange : le billet a le statut SOLD
       mockPrisma.ticket.findUnique.mockResolvedValue(MOCK_TICKET_SOLD);
 
-      // Act & Assert
       await expect(
         service.createCheckoutSession(TICKET_ID, BUYER_EMAIL),
       ).rejects.toThrow(BadRequestException);
@@ -295,16 +240,11 @@ describe('PaymentsService', () => {
       ).rejects.toThrow("Ce billet n'est plus disponible");
     });
 
-    it('❌ doit lever BadRequestException si le billet est en cours d\'achat (PENDING)', async () => {
-      /**
-       * Règle métier : un billet PENDING est déjà réservé par un autre acheteur
-       * (session Stripe ouverte). Il ne faut pas créer une seconde session.
-       */
+    it('doit lever BadRequestException si le billet est en cours d\'achat (PENDING)', async () => {
+      
 
-      // Arrange : le billet a le statut PENDING
       mockPrisma.ticket.findUnique.mockResolvedValue(MOCK_TICKET_PENDING);
 
-      // Act & Assert
       await expect(
         service.createCheckoutSession(TICKET_ID, BUYER_EMAIL),
       ).rejects.toThrow(BadRequestException);
@@ -314,13 +254,9 @@ describe('PaymentsService', () => {
       ).rejects.toThrow("Ce billet n'est plus disponible");
     });
 
-    // ── Scénario 3 : billet introuvable ──────────────────────────────────────
-
-    it('❌ doit lever NotFoundException si le billet n\'existe pas', async () => {
-      // Arrange : Prisma ne trouve aucun billet avec cet ID
+    it('doit lever NotFoundException si le billet n\'existe pas', async () => {
       mockPrisma.ticket.findUnique.mockResolvedValue(null);
 
-      // Act & Assert
       await expect(
         service.createCheckoutSession('uuid-inexistant', BUYER_EMAIL),
       ).rejects.toThrow(NotFoundException);
@@ -330,18 +266,11 @@ describe('PaymentsService', () => {
       ).rejects.toThrow('Billet non trouvé');
     });
 
-    // ── Scénario 4 : acheteur = vendeur ──────────────────────────────────────
+    it('doit lever BadRequestException si l\'acheteur est le vendeur du billet', async () => {
+      
 
-    it('❌ doit lever BadRequestException si l\'acheteur est le vendeur du billet', async () => {
-      /**
-       * Règle métier : un utilisateur ne peut pas acheter son propre billet.
-       * La comparaison est insensible à la casse.
-       */
-
-      // Arrange : l'acheteur utilise le même email que le vendeur
       mockPrisma.ticket.findUnique.mockResolvedValue(MOCK_TICKET_ON_SALE);
 
-      // Act & Assert
       await expect(
         service.createCheckoutSession(TICKET_ID, SELLER_EMAIL),
       ).rejects.toThrow(BadRequestException);
@@ -351,25 +280,17 @@ describe('PaymentsService', () => {
       ).rejects.toThrow('Vous ne pouvez pas acheter votre propre billet');
     });
 
-    it('❌ doit rejeter l\'achat même si la casse de l\'email vendeur diffère', async () => {
-      // Arrange : email vendeur en majuscules côté acheteur
+    it('doit rejeter l\'achat même si la casse de l\'email vendeur diffère', async () => {
       mockPrisma.ticket.findUnique.mockResolvedValue(MOCK_TICKET_ON_SALE);
 
-      // Act & Assert : la comparaison est case-insensitive
       await expect(
         service.createCheckoutSession(TICKET_ID, SELLER_EMAIL.toUpperCase()),
       ).rejects.toThrow('Vous ne pouvez pas acheter votre propre billet');
     });
 
-    // ── Scénario 5 : validation de l'email ───────────────────────────────────
+    it('doit lever BadRequestException si l\'email de l\'acheteur est invalide', async () => {
+      
 
-    it('❌ doit lever BadRequestException si l\'email de l\'acheteur est invalide', async () => {
-      /**
-       * Règle métier : un email valide est requis pour recevoir le billet
-       * et créer la session Stripe.
-       */
-
-      // Act & Assert : email sans @
       await expect(
         service.createCheckoutSession(TICKET_ID, 'email-invalide'),
       ).rejects.toThrow(BadRequestException);
@@ -379,31 +300,22 @@ describe('PaymentsService', () => {
       ).rejects.toThrow('Email invalide');
     });
 
-    it('❌ doit lever BadRequestException si l\'email est vide', async () => {
-      // Act & Assert
+    it('doit lever BadRequestException si l\'email est vide', async () => {
       await expect(
         service.createCheckoutSession(TICKET_ID, ''),
       ).rejects.toThrow(BadRequestException);
     });
   });
 
-  // ─── cancelPendingPurchase() ───────────────────────────────────────────────
-
   describe('cancelPendingPurchase()', () => {
-    it('✅ doit remettre un billet PENDING en vente (ON_SALE) lors d\'une annulation', async () => {
-      /**
-       * Règle métier : si l'utilisateur annule le paiement Stripe,
-       * le billet doit redevenir disponible pour d'autres acheteurs.
-       */
+    it('doit remettre un billet PENDING en vente (ON_SALE) lors d\'une annulation', async () => {
+      
 
-      // Arrange : le billet est actuellement PENDING
       mockPrisma.ticket.findUnique.mockResolvedValue(MOCK_TICKET_PENDING);
       mockPrisma.ticket.update.mockResolvedValue({ ...MOCK_TICKET_PENDING, status: TicketStatus.ON_SALE });
 
-      // Act
       const result = await service.cancelPendingPurchase(TICKET_ID);
 
-      // Assert : le billet est remis en vente
       expect(mockPrisma.ticket.update).toHaveBeenCalledWith({
         where: { id: TICKET_ID },
         data:  { status: TicketStatus.ON_SALE },
@@ -411,49 +323,36 @@ describe('PaymentsService', () => {
       expect(result).toEqual({ cancelled: true });
     });
 
-    it('✅ ne doit PAS modifier un billet qui n\'est pas PENDING', async () => {
-      /**
-       * Règle métier : on ne touche pas aux billets déjà SOLD ou ON_SALE.
-       */
+    it('ne doit PAS modifier un billet qui n\'est pas PENDING', async () => {
+      
 
-      // Arrange : le billet est déjà ON_SALE (pas PENDING)
       mockPrisma.ticket.findUnique.mockResolvedValue(MOCK_TICKET_ON_SALE);
 
-      // Act
       const result = await service.cancelPendingPurchase(TICKET_ID);
 
-      // Assert : aucun update Prisma ne doit être effectué
       expect(mockPrisma.ticket.update).not.toHaveBeenCalled();
       expect(result).toEqual({ cancelled: true });
     });
 
-    it('✅ doit retourner { cancelled: true } même si le billet est introuvable', async () => {
-      // Arrange
+    it('doit retourner { cancelled: true } même si le billet est introuvable', async () => {
       mockPrisma.ticket.findUnique.mockResolvedValue(null);
 
-      // Act
       const result = await service.cancelPendingPurchase('uuid-inexistant');
 
-      // Assert
       expect(result).toEqual({ cancelled: true });
       expect(mockPrisma.ticket.update).not.toHaveBeenCalled();
     });
   });
 
-  // ─── validateTicket() ─────────────────────────────────────────────────────
-
   describe('validateTicket()', () => {
-    it('✅ doit valider le billet si le GP est passé et la validation en attente', async () => {
-      // Arrange
+    it('doit valider le billet si le GP est passé et la validation en attente', async () => {
       mockPrisma.transaction.findUnique.mockResolvedValue(MOCK_TRANSACTION_PENDING);
       mockPrisma.transaction.update.mockResolvedValue({
         ...MOCK_TRANSACTION_PENDING, buyerValidation: 'VALID',
       });
 
-      // Act
       const result = await service.validateTicket(TRANSACTION_ID, BUYER_ID);
 
-      // Assert
       expect(result).toEqual({ success: true, status: 'VALID' });
       expect(mockPrisma.transaction.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -462,40 +361,33 @@ describe('PaymentsService', () => {
       );
     });
 
-    it('❌ doit lever NotFoundException si la transaction est introuvable', async () => {
-      // Arrange
+    it('doit lever NotFoundException si la transaction est introuvable', async () => {
       mockPrisma.transaction.findUnique.mockResolvedValue(null);
 
-      // Act & Assert
       await expect(
         service.validateTicket('uuid-inexistant', BUYER_ID),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('❌ doit lever ForbiddenException si l\'utilisateur n\'est pas l\'acheteur', async () => {
-      // Arrange : la transaction appartient à BUYER_ID, pas à SELLER_ID
+    it('doit lever ForbiddenException si l\'utilisateur n\'est pas l\'acheteur', async () => {
       mockPrisma.transaction.findUnique.mockResolvedValue(MOCK_TRANSACTION_PENDING);
 
-      // Act & Assert
       await expect(
         service.validateTicket(TRANSACTION_ID, SELLER_ID),
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('❌ doit lever BadRequestException si la validation est déjà effectuée', async () => {
-      // Arrange : validation déjà VALID
+    it('doit lever BadRequestException si la validation est déjà effectuée', async () => {
       mockPrisma.transaction.findUnique.mockResolvedValue({
         ...MOCK_TRANSACTION_PENDING, buyerValidation: 'VALID',
       });
 
-      // Act & Assert
       await expect(
         service.validateTicket(TRANSACTION_ID, BUYER_ID),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('❌ doit lever BadRequestException si le GP n\'a pas encore eu lieu', async () => {
-      // Arrange : date du GP dans le futur
+    it('doit lever BadRequestException si le GP n\'a pas encore eu lieu', async () => {
       mockPrisma.transaction.findUnique.mockResolvedValue({
         ...MOCK_TRANSACTION_PENDING,
         ticket: {
@@ -504,14 +396,11 @@ describe('PaymentsService', () => {
         },
       });
 
-      // Act & Assert
       await expect(
         service.validateTicket(TRANSACTION_ID, BUYER_ID),
       ).rejects.toThrow(BadRequestException);
     });
   });
-
-  // ─── handleWebhook() ──────────────────────────────────────────────────────
 
   describe('handleWebhook()', () => {
     const MOCK_PAYLOAD   = Buffer.from('{"type":"checkout.session.completed"}');
@@ -528,7 +417,7 @@ describe('PaymentsService', () => {
       });
     });
 
-    it('❌ doit lever BadRequestException si le webhook secret nest pas configuré', async () => {
+    it('doit lever BadRequestException si le webhook secret nest pas configuré', async () => {
       mockConfigService.get.mockImplementation((key: string) =>
         key === 'STRIPE_SECRET_KEY' ? 'sk_test_fake_key_for_unit_tests' : null,
       );
@@ -538,7 +427,7 @@ describe('PaymentsService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('❌ doit lever BadRequestException si la signature Stripe est invalide', async () => {
+    it('doit lever BadRequestException si la signature Stripe est invalide', async () => {
       mockStripeInstance.webhooks.constructEvent.mockImplementation(() => {
         throw new Error('Invalid signature');
       });
@@ -552,7 +441,7 @@ describe('PaymentsService', () => {
       ).rejects.toThrow('Webhook Error: Invalid signature');
     });
 
-    it('✅ doit traiter un événement checkout.session.completed et créer la transaction', async () => {
+    it('doit traiter un événement checkout.session.completed et créer la transaction', async () => {
       mockStripeInstance.webhooks.constructEvent.mockReturnValue({
         type: 'checkout.session.completed',
         data: {
@@ -584,7 +473,7 @@ describe('PaymentsService', () => {
       );
     });
 
-    it('✅ doit lier la transaction à un compte existant si email correspond', async () => {
+    it('doit lier la transaction à un compte existant si email correspond', async () => {
       const existingUser = { id: BUYER_ID, email: BUYER_EMAIL };
       mockStripeInstance.webhooks.constructEvent.mockReturnValue({
         type: 'checkout.session.completed',
@@ -606,7 +495,7 @@ describe('PaymentsService', () => {
       );
     });
 
-    it('✅ doit ignorer les événements non gérés', async () => {
+    it('doit ignorer les événements non gérés', async () => {
       mockStripeInstance.webhooks.constructEvent.mockReturnValue({
         type: 'payment_intent.created',
         data: { object: {} },
@@ -618,8 +507,6 @@ describe('PaymentsService', () => {
       expect(mockPrisma.transaction.create).not.toHaveBeenCalled();
     });
   });
-
-  // ─── verifySession() ──────────────────────────────────────────────────────
 
   describe('verifySession()', () => {
     const SESSION_ID = 'cs_test_monaco_2026';
@@ -643,7 +530,7 @@ describe('PaymentsService', () => {
       transaction: { id: TRANSACTION_ID },
     };
 
-    it('✅ doit retourner { success: false } si le paiement nest pas complété', async () => {
+    it('doit retourner { success: false } si le paiement nest pas complété', async () => {
       mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue({
         ...MOCK_SESSION_PAID,
         payment_status: 'unpaid',
@@ -654,7 +541,7 @@ describe('PaymentsService', () => {
       expect(result).toEqual({ success: false });
     });
 
-    it('✅ doit retourner { success: false } si ticketId est absent des metadata', async () => {
+    it('doit retourner { success: false } si ticketId est absent des metadata', async () => {
       mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue({
         ...MOCK_SESSION_PAID,
         metadata: {},
@@ -665,7 +552,7 @@ describe('PaymentsService', () => {
       expect(result).toEqual({ success: false });
     });
 
-    it('✅ doit retourner { success: false } si le billet est introuvable en BDD', async () => {
+    it('doit retourner { success: false } si le billet est introuvable en BDD', async () => {
       mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue(MOCK_SESSION_PAID);
       mockPrisma.ticket.findUnique.mockResolvedValue(null);
 
@@ -674,7 +561,7 @@ describe('PaymentsService', () => {
       expect(result).toEqual({ success: false });
     });
 
-    it('✅ doit retourner les détails du billet si la transaction est déjà en BDD', async () => {
+    it('doit retourner les détails du billet si la transaction est déjà en BDD', async () => {
       mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue(MOCK_SESSION_PAID);
       mockPrisma.ticket.findUnique.mockResolvedValue(MOCK_TICKET_WITH_TRANSACTION);
 
@@ -690,7 +577,7 @@ describe('PaymentsService', () => {
       });
     });
 
-    it('✅ doit compléter la transaction si elle nexiste pas encore en BDD', async () => {
+    it('doit compléter la transaction si elle nexiste pas encore en BDD', async () => {
       mockStripeInstance.checkout.sessions.retrieve.mockResolvedValue(MOCK_SESSION_PAID);
       mockPrisma.ticket.findUnique
         .mockResolvedValueOnce({ ...MOCK_TICKET_WITH_TRANSACTION, transaction: null })
@@ -706,25 +593,20 @@ describe('PaymentsService', () => {
     });
   });
 
-  // ─── disputeTicket() ──────────────────────────────────────────────────────
-
   describe('disputeTicket()', () => {
     beforeEach(() => {
       mockPrisma.$transaction.mockImplementation((ops: any[]) => Promise.all(ops));
     });
 
-    it('✅ doit créer un litige et initier le remboursement Stripe', async () => {
-      // Arrange
+    it('doit créer un litige et initier le remboursement Stripe', async () => {
       mockPrisma.transaction.findUnique.mockResolvedValue(MOCK_TRANSACTION_PENDING);
       mockPrisma.transaction.update.mockResolvedValue({
         ...MOCK_TRANSACTION_PENDING, buyerValidation: 'DISPUTED', status: 'REFUNDED',
       });
       mockPrisma.dispute.create.mockResolvedValue({ id: 'dispute-001' });
 
-      // Act
       const result = await service.disputeTicket(TRANSACTION_ID, BUYER_ID);
 
-      // Assert
       expect(result).toEqual({ success: true, status: 'DISPUTED' });
       expect(mockStripeInstance.refunds.create).toHaveBeenCalledWith(
         expect.objectContaining({ payment_intent: 'pi_test_monaco_2026' }),
@@ -732,16 +614,13 @@ describe('PaymentsService', () => {
       expect(mockPrisma.$transaction).toHaveBeenCalled();
     });
 
-    it('✅ doit marquer la transaction en REFUNDED lors d\'un litige', async () => {
-      // Arrange
+    it('doit marquer la transaction en REFUNDED lors d\'un litige', async () => {
       mockPrisma.transaction.findUnique.mockResolvedValue(MOCK_TRANSACTION_PENDING);
       mockPrisma.transaction.update.mockResolvedValue({});
       mockPrisma.dispute.create.mockResolvedValue({});
 
-      // Act
       await service.disputeTicket(TRANSACTION_ID, BUYER_ID);
 
-      // Assert : la transaction atomique inclut bien un update vers REFUNDED
       expect(mockPrisma.$transaction).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.anything(),
@@ -750,33 +629,27 @@ describe('PaymentsService', () => {
       );
     });
 
-    it('❌ doit lever NotFoundException si la transaction est introuvable', async () => {
-      // Arrange
+    it('doit lever NotFoundException si la transaction est introuvable', async () => {
       mockPrisma.transaction.findUnique.mockResolvedValue(null);
 
-      // Act & Assert
       await expect(
         service.disputeTicket('uuid-inexistant', BUYER_ID),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('❌ doit lever ForbiddenException si l\'utilisateur n\'est pas l\'acheteur', async () => {
-      // Arrange
+    it('doit lever ForbiddenException si l\'utilisateur n\'est pas l\'acheteur', async () => {
       mockPrisma.transaction.findUnique.mockResolvedValue(MOCK_TRANSACTION_PENDING);
 
-      // Act & Assert
       await expect(
         service.disputeTicket(TRANSACTION_ID, SELLER_ID),
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('❌ doit lever BadRequestException si un litige est déjà ouvert', async () => {
-      // Arrange : validation déjà DISPUTED
+    it('doit lever BadRequestException si un litige est déjà ouvert', async () => {
       mockPrisma.transaction.findUnique.mockResolvedValue({
         ...MOCK_TRANSACTION_PENDING, buyerValidation: 'DISPUTED',
       });
 
-      // Act & Assert
       await expect(
         service.disputeTicket(TRANSACTION_ID, BUYER_ID),
       ).rejects.toThrow(BadRequestException);

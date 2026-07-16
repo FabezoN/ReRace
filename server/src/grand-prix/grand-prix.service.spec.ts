@@ -1,12 +1,3 @@
-/**
- * TESTS UNITAIRES — GrandPrixService (stub corrigé)
- *
- * Cause de l'échec d'origine :
- *   Le CLI NestJS génère un stub qui instancie GrandPrixService sans fournir
- *   PrismaService dans le module de test → erreur d'injection de dépendances.
- *
- * Correctif : injecter un mock de PrismaService via { provide, useValue }.
- */
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { GrandPrixService } from './grand-prix.service';
@@ -15,8 +6,6 @@ import axios from 'axios';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
-
-// ─── Données fictives ─────────────────────────────────────────────────────────
 
 const MOCK_RACE_NO_TIME = {
   season: '2026',
@@ -60,8 +49,6 @@ const mockPrisma = {
   },
 };
 
-// ─── Suite de tests ───────────────────────────────────────────────────────────
-
 describe('GrandPrixService', () => {
   let service: GrandPrixService;
 
@@ -77,14 +64,12 @@ describe('GrandPrixService', () => {
     jest.clearAllMocks();
   });
 
-  it('✅ le service doit être instancié correctement', () => {
+  it('le service doit être instancié correctement', () => {
     expect(service).toBeDefined();
   });
 
-  // ─── findAll() ────────────────────────────────────────────────────────────
-
   describe('findAll()', () => {
-    it('✅ doit retourner la liste des GPs de la saison 2026 par défaut', async () => {
+    it('doit retourner la liste des GPs de la saison 2026 par défaut', async () => {
       mockPrisma.grandPrix.findMany.mockResolvedValue([MOCK_GP_UPSERTED]);
 
       const result = await service.findAll();
@@ -95,7 +80,7 @@ describe('GrandPrixService', () => {
       );
     });
 
-    it('✅ doit filtrer par saison si fournie', async () => {
+    it('doit filtrer par saison si fournie', async () => {
       mockPrisma.grandPrix.findMany.mockResolvedValue([]);
 
       await service.findAll(2025);
@@ -106,10 +91,8 @@ describe('GrandPrixService', () => {
     });
   });
 
-  // ─── findOne() ────────────────────────────────────────────────────────────
-
   describe('findOne()', () => {
-    it('✅ doit retourner un GP avec ses billets disponibles', async () => {
+    it('doit retourner un GP avec ses billets disponibles', async () => {
       mockPrisma.grandPrix.findUnique.mockResolvedValue(MOCK_GP_UPSERTED);
 
       const result = await service.findOne('gp-uuid-001');
@@ -120,7 +103,7 @@ describe('GrandPrixService', () => {
       );
     });
 
-    it('✅ doit retourner null si le GP est introuvable', async () => {
+    it('doit retourner null si le GP est introuvable', async () => {
       mockPrisma.grandPrix.findUnique.mockResolvedValue(null);
 
       const result = await service.findOne('uuid-inexistant');
@@ -129,10 +112,8 @@ describe('GrandPrixService', () => {
     });
   });
 
-  // ─── syncFromJolpica() ────────────────────────────────────────────────────
-
   describe('syncFromJolpica()', () => {
-    it('✅ doit synchroniser les courses depuis l\'API Jolpica', async () => {
+    it('doit synchroniser les courses depuis l\'API Jolpica', async () => {
       mockedAxios.get.mockResolvedValue({
         data: { MRData: { RaceTable: { Races: [MOCK_RACE_NO_TIME] } } },
       });
@@ -147,7 +128,7 @@ describe('GrandPrixService', () => {
       expect(mockPrisma.grandPrix.upsert).toHaveBeenCalledTimes(1);
     });
 
-    it('✅ doit upsert avec le bon externalId (jolpica-{season}-{round})', async () => {
+    it('doit upsert avec le bon externalId (jolpica-{season}-{round})', async () => {
       mockedAxios.get.mockResolvedValue({
         data: { MRData: { RaceTable: { Races: [MOCK_RACE_NO_TIME] } } },
       });
@@ -163,7 +144,7 @@ describe('GrandPrixService', () => {
       );
     });
 
-    it('✅ doit parser l\'heure de la course si le champ time est présent', async () => {
+    it('doit parser l\'heure de la course si le champ time est présent', async () => {
       mockedAxios.get.mockResolvedValue({
         data: { MRData: { RaceTable: { Races: [MOCK_RACE_WITH_TIME] } } },
       });
@@ -178,7 +159,7 @@ describe('GrandPrixService', () => {
       expect(savedDate.getMinutes()).toBe(0);
     });
 
-    it('✅ doit supprimer les GPs orphelins sans billets', async () => {
+    it('doit supprimer les GPs orphelins sans billets', async () => {
       mockedAxios.get.mockResolvedValue({
         data: { MRData: { RaceTable: { Races: [MOCK_RACE_NO_TIME] } } },
       });
@@ -193,7 +174,7 @@ describe('GrandPrixService', () => {
       expect(mockPrisma.grandPrix.delete).toHaveBeenCalledWith({ where: { id: 'orphan-gp' } });
     });
 
-    it('✅ doit conserver les GPs orphelins qui ont des billets associés', async () => {
+    it('doit conserver les GPs orphelins qui ont des billets associés', async () => {
       mockedAxios.get.mockResolvedValue({
         data: { MRData: { RaceTable: { Races: [MOCK_RACE_NO_TIME] } } },
       });
@@ -207,7 +188,7 @@ describe('GrandPrixService', () => {
       expect(mockPrisma.grandPrix.delete).not.toHaveBeenCalled();
     });
 
-    it('❌ doit lever une erreur si l\'API Jolpica est inaccessible', async () => {
+    it('doit lever une erreur si l\'API Jolpica est inaccessible', async () => {
       mockedAxios.get.mockRejectedValue(new Error('Network Error'));
 
       await expect(service.syncFromJolpica(2026)).rejects.toThrow(
